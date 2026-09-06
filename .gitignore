@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# planejamento interno da equipe, nao versionar
+planejamento-tarefas.md
+
+# variaveis de ambiente locais
+.env
+.env.*
+!.env.example
+!.env.prod.example

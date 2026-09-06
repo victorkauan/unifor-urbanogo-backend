@@ -1,0 +1,25 @@
+import "dotenv/config";
+import { z } from "zod";
+
+const schema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  HOST: z.string().default("0.0.0.0"),
+  PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  DATABASE_URL: z.string().url(),
+  REDIS_URL: z.string().url(),
+  JWT_SECRET: z.string().min(16),
+});
+
+const parsed = schema.safeParse(process.env);
+
+if (!parsed.success) {
+  const details = parsed.error.issues
+    .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+    .join("\n");
+  console.error(`Invalid environment configuration:\n${details}`);
+  process.exit(1);
+}
+
+export const config = parsed.data;
+export type Config = typeof config;
