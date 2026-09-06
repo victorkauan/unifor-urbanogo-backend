@@ -132,6 +132,9 @@ Confirmando o que já estava no planejamento:
 - Commits e PRs: um PR por tarefa do Linear, pequeno, CI verde antes do merge.
 - Nomes de tabela e coluna em `snake_case`; Prisma mapeia para `camelCase` no
   código via `@map`.
+- Testes de integração que precisam de banco real sobem PostgreSQL e Redis
+  efêmeros com Testcontainers (biblioteca `testcontainers`), não com o compose de
+  desenvolvimento. O harness é montado na tarefa TST-1.
 
 ## Consequências
 
@@ -142,3 +145,8 @@ Confirmando o que já estava no planejamento:
   escala (URB-63) trata disso.
 - `setTimeout` em processo significa que a instância da API fica stateful durante
   uma busca ativa. Aceitável no MVP de instância única.
+
+## Histórico
+
+- 2026-09-06: versão inicial.
+- 2026-09-06: adicionada a decisão de Testcontainers para testes de integração.

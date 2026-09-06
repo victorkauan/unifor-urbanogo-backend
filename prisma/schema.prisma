@@ -6,3 +6,210 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum UserRole {
+  passenger
+  driver
+  both
+}
+
+enum ServicePreference {
+  rides
+  deliveries
+  both
+}
+
+enum RideType {
+  ride
+  delivery
+}
+
+enum RideStatus {
+  requested
+  searching
+  assigned
+  in_progress
+  completed
+  cancelled
+  expired
+}
+
+enum CancelledBy {
+  passenger
+  driver
+  system
+}
+
+enum OfferStatus {
+  pending
+  accepted
+  rejected
+  timed_out
+  cancelled
+}
+
+enum TrustScoreSource {
+  stub
+  llm
+}
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  phone        String?
+  role         UserRole
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  driver           Driver?
+  ridesAsPassenger Ride[]      @relation("ride_passenger")
+  ratingsGiven     Rating[]    @relation("rating_rater")
+  ratingsReceived  Rating[]    @relation("rating_ratee")
+  trustScore       TrustScore?
+
+  @@map("users")
+}
+
+model Driver {
+  id                String            @id @default(uuid(7)) @db.Uuid
+  userId            String            @unique @map("user_id") @db.Uuid
+  user              User              @relation(fields: [userId], references: [id])
+  servicePreference ServicePreference @map("service_preference")
+  isOnline          Boolean           @default(false) @map("is_online")
+  vehicleModel      String?           @map("vehicle_model")
+  vehiclePlate      String?           @map("vehicle_plate")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  rides    Ride[]          @relation("ride_driver")
+  offers   RideOffer[]
+  location DriverLocation?
+
+  @@map("drivers")
+}
+
+model Ride {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  passengerId    String       @map("passenger_id") @db.Uuid
+  passenger      User         @relation("ride_passenger", fields: [passengerId], references: [id])
+  driverId       String?      @map("driver_id") @db.Uuid
+  driver         Driver?      @relation("ride_driver", fields: [driverId], references: [id])
+  type           RideType
+  status         RideStatus   @default(requested)
+  originLat      Float        @map("origin_lat")
+  originLng      Float        @map("origin_lng")
+  originAddress  String?      @map("origin_address")
+  destLat        Float        @map("dest_lat")
+  destLng        Float        @map("dest_lng")
+  destAddress    String?      @map("dest_address")
+  distanceMeters Int?         @map("distance_meters")
+  priceCents     Int?         @map("price_cents")
+  priceBreakdown Json?        @map("price_breakdown")
+  requestedAt    DateTime     @default(now()) @map("requested_at") @db.Timestamptz(6)
+  assignedAt     DateTime?    @map("assigned_at") @db.Timestamptz(6)
+  startedAt      DateTime?    @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?    @map("completed_at") @db.Timestamptz(6)
+  cancelledAt    DateTime?    @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy    CancelledBy? @map("cancelled_by")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  offers  RideOffer[]
+  ratings Rating[]
+
+  @@index([status])
+  @@index([driverId])
+  @@index([passengerId])
+  @@map("rides")
+}
+
+model RideOffer {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  rideId      String      @map("ride_id") @db.Uuid
+  ride        Ride        @relation(fields: [rideId], references: [id])
+  driverId    String      @map("driver_id") @db.Uuid
+  driver      Driver      @relation(fields: [driverId], references: [id])
+  position    Int
+  status      OfferStatus @default(pending)
+  offeredAt   DateTime    @default(now()) @map("offered_at") @db.Timestamptz(6)
+  respondedAt DateTime?   @map("responded_at") @db.Timestamptz(6)
+  expiresAt   DateTime    @map("expires_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([rideId, driverId])
+  @@index([rideId, status])
+  @@map("ride_offers")
+}
+
+model DriverLocation {
+  driverId   String   @id @map("driver_id") @db.Uuid
+  driver     Driver   @relation(fields: [driverId], references: [id])
+  lat        Float
+  lng        Float
+  heading    Float?
+  speed      Float?
+  accuracy   Float?
+  recordedAt DateTime @map("recorded_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([lat, lng])
+  @@map("driver_locations")
+}
+
+model Rating {
+  id      String  @id @default(uuid(7)) @db.Uuid
+  rideId  String  @map("ride_id") @db.Uuid
+  ride    Ride    @relation(fields: [rideId], references: [id])
+  raterId String  @map("rater_id") @db.Uuid
+  rater   User    @relation("rating_rater", fields: [raterId], references: [id])
+  rateeId String  @map("ratee_id") @db.Uuid
+  ratee   User    @relation("rating_ratee", fields: [rateeId], references: [id])
+  score   Int
+  comment String?
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@unique([rideId, raterId])
+  @@index([rateeId])
+  @@map("ratings")
+}
+
+model TrustScore {
+  userId     String           @id @map("user_id") @db.Uuid
+  user       User             @relation(fields: [userId], references: [id])
+  score      Float
+  source     TrustScoreSource
+  rationale  String?
+  computedAt DateTime         @map("computed_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("trust_scores")
+}
