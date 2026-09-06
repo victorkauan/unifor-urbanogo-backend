@@ -21,6 +21,8 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 | [docs/visao-geral.md](docs/visao-geral.md) | Contexto do negócio, escopo, SLA e mapa de disciplinas |
 | [docs/arquitetura.md](docs/arquitetura.md) | Stack, motor de matching e precificação, visão macro |
 | [docs/roadmap.md](docs/roadmap.md) | Entregas do curso e continuidade do produto |
+| [docs/contrato-api.md](docs/contrato-api.md) | Endpoints REST e eventos WebSocket |
+| [docs/er.md](docs/er.md) | Modelo de dados |
 | [docs/setup.md](docs/setup.md) | Rodar o backend em desenvolvimento e produção |
 | [docs/adr/0001-stack.md](docs/adr/0001-stack.md) | Decisões de stack e convenções de código |
 
