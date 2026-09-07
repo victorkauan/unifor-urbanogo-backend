@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.1.0",
     "fastify-plugin": "^5.0.1",
@@ -47,7 +48,8 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.0",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "@types/bcrypt": "^5.0.2"
   },
   "overrides": {
     "deepmerge-ts": "^8.0.2"
