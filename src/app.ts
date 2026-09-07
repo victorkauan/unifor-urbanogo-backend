@@ -5,6 +5,7 @@ import { AppError } from "./lib/errors.js";
 import { responsePlugin } from "./lib/response.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
+import { socketPlugin } from "./plugins/socket.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 
 export async function buildApp() {
@@ -27,6 +28,7 @@ export async function buildApp() {
   await app.register(responsePlugin);
   await app.register(prismaPlugin);
   await app.register(redisPlugin);
+  await app.register(socketPlugin);
 
   await app.register(healthRoutes);
 
