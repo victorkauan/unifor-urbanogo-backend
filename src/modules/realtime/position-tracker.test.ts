@@ -1,7 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import type { FastifyBaseLogger } from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createPositionTracker, projectPosition, type PositionTracker } from "./position-tracker.js";
+import {
+  createPositionTracker,
+  projectPosition,
+  type PositionTracker,
+} from "./position-tracker.js";
 import { rideRoom } from "./realtime.gateway.js";
 import type { DriverLocationEvent } from "./realtime.schema.js";
 
@@ -17,7 +21,13 @@ function fakePrisma(activeRideId: string | null) {
 }
 
 function fakeLog(): FastifyBaseLogger {
-  return { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn() } as unknown as FastifyBaseLogger;
+  return {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn(),
+  } as unknown as FastifyBaseLogger;
 }
 
 const baseLocation: DriverLocationEvent = {
@@ -54,7 +64,12 @@ describe("position tracker", () => {
     expect(to).toHaveBeenCalledWith(rideRoom(rideId));
     expect(emit).toHaveBeenCalledWith(
       "ride:driver_location",
-      expect.objectContaining({ ride_id: rideId, lat: baseLocation.lat, lng: baseLocation.lng, predicted: false }),
+      expect.objectContaining({
+        ride_id: rideId,
+        lat: baseLocation.lat,
+        lng: baseLocation.lng,
+        predicted: false,
+      }),
     );
   });
 
@@ -92,7 +107,11 @@ describe("position tracker", () => {
 
     await tracker.handleDriverLocation({
       userId: "driver-1",
-      location: { lat: baseLocation.lat, lng: baseLocation.lng, recorded_at: baseLocation.recorded_at },
+      location: {
+        lat: baseLocation.lat,
+        lng: baseLocation.lng,
+        recorded_at: baseLocation.recorded_at,
+      },
     });
     await new Promise((resolve) => setTimeout(resolve, 60));
 

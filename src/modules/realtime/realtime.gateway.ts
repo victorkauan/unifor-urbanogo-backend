@@ -28,7 +28,11 @@ function emitInvalidPayload(socket: RealtimeSocket, event: string, message: stri
   socket.emit("error", { code: "invalid_payload", message });
 }
 
-export function registerRealtimeGateway(io: RealtimeServer, redis: Redis, tracker: PositionTracker) {
+export function registerRealtimeGateway(
+  io: RealtimeServer,
+  redis: Redis,
+  tracker: PositionTracker,
+) {
   io.on("connection", (socket: RealtimeSocket) => {
     const { log, userId } = socketData(socket);
     log.info("socket conectado");

@@ -50,7 +50,8 @@ export function projectPosition(
   const distanceMeters = (location.speed ?? 0) * elapsedSeconds;
   const headingRad = ((location.heading ?? 0) * Math.PI) / 180;
 
-  const deltaLat = ((distanceMeters * Math.cos(headingRad)) / EARTH_RADIUS_METERS) * (180 / Math.PI);
+  const deltaLat =
+    ((distanceMeters * Math.cos(headingRad)) / EARTH_RADIUS_METERS) * (180 / Math.PI);
   const deltaLng =
     ((distanceMeters * Math.sin(headingRad)) /
       (EARTH_RADIUS_METERS * Math.cos((location.lat * Math.PI) / 180))) *
@@ -82,14 +83,19 @@ export function createPositionTracker(
     io.to(rideRoom(rideId)).emit("ride:driver_location", payload);
   }
 
-  function scheduleDeadReckoning(rideId: string, location: DriverLocationEvent): NodeJS.Timeout | undefined {
+  function scheduleDeadReckoning(
+    rideId: string,
+    location: DriverLocationEvent,
+  ): NodeJS.Timeout | undefined {
     if (location.heading === undefined || location.speed === undefined || location.speed <= 0) {
       return undefined;
     }
 
     const timeout = setTimeout(() => {
       const projected = projectPosition(location, predictedDelayMs / 1000);
-      const projectedRecordedAt = new Date(Date.parse(location.recorded_at) + predictedDelayMs).toISOString();
+      const projectedRecordedAt = new Date(
+        Date.parse(location.recorded_at) + predictedDelayMs,
+      ).toISOString();
       broadcast(rideId, { ...location, ...projected, recorded_at: projectedRecordedAt }, true);
     }, predictedDelayMs);
     timeout.unref();

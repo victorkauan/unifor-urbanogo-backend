@@ -3,7 +3,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import { buildApp, type AppInstance } from "../app.js";
 import { signToken } from "../lib/jwt.js";
-import { DRIVER_LOCATION_TTL_SECONDS, driverLocationKey } from "../modules/realtime/driver-location.repo.js";
+import {
+  DRIVER_LOCATION_TTL_SECONDS,
+  driverLocationKey,
+} from "../modules/realtime/driver-location.repo.js";
 import { rideRoom } from "../modules/realtime/realtime.gateway.js";
 
 let app: AppInstance;
@@ -163,7 +166,10 @@ describe("server-side position broadcast (RT-4)", () => {
       recorded_at: new Date().toISOString(),
     });
 
-    const msg = await waitFor<{ ride_id: string; predicted: boolean }>(passenger, "ride:driver_location");
+    const msg = await waitFor<{ ride_id: string; predicted: boolean }>(
+      passenger,
+      "ride:driver_location",
+    );
 
     expect(msg.ride_id).toBe(rideId);
     expect(msg.predicted).toBe(false);

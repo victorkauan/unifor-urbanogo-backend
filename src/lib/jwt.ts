@@ -5,10 +5,7 @@ export interface JwtPayload {
   sub: string;
 }
 
-export function signToken(
-  payload: JwtPayload,
-  expiresIn: SignOptions["expiresIn"] = "1d",
-): string {
+export function signToken(payload: JwtPayload, expiresIn: SignOptions["expiresIn"] = "1d"): string {
   return jwt.sign(payload, config.JWT_SECRET, { expiresIn });
 }
 

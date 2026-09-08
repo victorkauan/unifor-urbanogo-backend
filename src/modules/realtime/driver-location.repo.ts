@@ -21,7 +21,12 @@ export async function saveDriverLocation(
   location: DriverLocationEvent,
 ): Promise<void> {
   const record: StoredDriverLocation = { ...location, updated_at: new Date().toISOString() };
-  await redis.set(driverLocationKey(userId), JSON.stringify(record), "EX", DRIVER_LOCATION_TTL_SECONDS);
+  await redis.set(
+    driverLocationKey(userId),
+    JSON.stringify(record),
+    "EX",
+    DRIVER_LOCATION_TTL_SECONDS,
+  );
 }
 
 export async function getDriverLocation(

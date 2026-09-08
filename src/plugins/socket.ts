@@ -3,7 +3,10 @@ import fp from "fastify-plugin";
 import { Server } from "socket.io";
 import { verifyToken } from "../lib/jwt.js";
 import { createPositionTracker } from "../modules/realtime/position-tracker.js";
-import { registerRealtimeGateway, type RealtimeServer } from "../modules/realtime/realtime.gateway.js";
+import {
+  registerRealtimeGateway,
+  type RealtimeServer,
+} from "../modules/realtime/realtime.gateway.js";
 
 declare module "fastify" {
   interface FastifyInstance {
