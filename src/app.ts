@@ -6,6 +6,7 @@ import { responsePlugin } from "./lib/response.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
+import { driverRoutes } from "./modules/drivers/drivers.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -29,6 +30,8 @@ export async function buildApp() {
   await app.register(redisPlugin);
 
   await app.register(healthRoutes);
+
+  await app.register(driverRoutes, { prefix: "/drivers" });
 
   app.setNotFoundHandler((req, reply) => {
     reply.fail(404, `Rota não encontrada: ${req.method} ${req.url}`);
