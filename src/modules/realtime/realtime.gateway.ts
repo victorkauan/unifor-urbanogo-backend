@@ -37,24 +37,30 @@ export function registerRealtimeGateway(
     const { log, userId } = socketData(socket);
     log.info("socket conectado");
 
-    socket.on("ride:join", (payload: unknown) => {
+    socket.on("ride:join", (payload: unknown, ack?: (result: { ok: boolean }) => void) => {
       const parsed = rideRoomEventSchema.safeParse(payload);
       if (!parsed.success) {
         emitInvalidPayload(socket, "ride:join", "ride_id inválido ou ausente");
+        ack?.({ ok: false });
         return;
       }
-      void socket.join(rideRoom(parsed.data.ride_id));
-      log.child({ rideId: parsed.data.ride_id }).info("entrou na sala da corrida");
+      void Promise.resolve(socket.join(rideRoom(parsed.data.ride_id))).then(() => {
+        log.child({ rideId: parsed.data.ride_id }).info("entrou na sala da corrida");
+        ack?.({ ok: true });
+      });
     });
 
-    socket.on("ride:leave", (payload: unknown) => {
+    socket.on("ride:leave", (payload: unknown, ack?: (result: { ok: boolean }) => void) => {
       const parsed = rideRoomEventSchema.safeParse(payload);
       if (!parsed.success) {
         emitInvalidPayload(socket, "ride:leave", "ride_id inválido ou ausente");
+        ack?.({ ok: false });
         return;
       }
-      void socket.leave(rideRoom(parsed.data.ride_id));
-      log.child({ rideId: parsed.data.ride_id }).info("saiu da sala da corrida");
+      void Promise.resolve(socket.leave(rideRoom(parsed.data.ride_id))).then(() => {
+        log.child({ rideId: parsed.data.ride_id }).info("saiu da sala da corrida");
+        ack?.({ ok: true });
+      });
     });
 
     socket.on("driver:location", (payload: unknown) => {

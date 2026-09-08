@@ -33,6 +33,10 @@ function waitFor<T = unknown>(socket: ClientSocket, event: string): Promise<T> {
   return new Promise((resolve) => socket.once(event, resolve));
 }
 
+function joinRide(socket: ClientSocket, rideId: string): Promise<{ ok: boolean }> {
+  return new Promise((resolve) => socket.emit("ride:join", { ride_id: rideId }, resolve));
+}
+
 describe("socket handshake", () => {
   it("rejects a connection without a token", async () => {
     const client = connect();
@@ -64,12 +68,7 @@ describe("ride room join/leave", () => {
     const driver = connect(signToken({ sub: randomUUID() }));
 
     await Promise.all([waitFor(passenger, "connect"), waitFor(driver, "connect")]);
-
-    passenger.emit("ride:join", { ride_id: rideId });
-    driver.emit("ride:join", { ride_id: rideId });
-
-    // dá tempo do join ser processado no servidor antes do broadcast
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await Promise.all([joinRide(passenger, rideId), joinRide(driver, rideId)]);
 
     const statusPayload = { ride_id: rideId, status: "assigned" };
     const [passengerMsg, driverMsg] = await Promise.all([
@@ -113,13 +112,13 @@ describe("driver:location ingestion", () => {
       recorded_at: new Date().toISOString(),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(setSpy).toHaveBeenCalledWith(
-      driverLocationKey(userId),
-      expect.any(String),
-      "EX",
-      DRIVER_LOCATION_TTL_SECONDS,
+    await vi.waitFor(() =>
+      expect(setSpy).toHaveBeenCalledWith(
+        driverLocationKey(userId),
+        expect.any(String),
+        "EX",
+        DRIVER_LOCATION_TTL_SECONDS,
+      ),
     );
 
     setSpy.mockRestore();
@@ -154,9 +153,7 @@ describe("server-side position broadcast (RT-4)", () => {
     const passenger = connect(signToken({ sub: randomUUID() }));
     const driver = connect(signToken({ sub: driverUserId }));
     await Promise.all([waitFor(passenger, "connect"), waitFor(driver, "connect")]);
-
-    passenger.emit("ride:join", { ride_id: rideId });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await joinRide(passenger, rideId);
 
     driver.emit("driver:location", {
       lat: -3.73,
@@ -200,7 +197,8 @@ describe("server-side position broadcast (RT-4)", () => {
       recorded_at: new Date().toISOString(),
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // asserção negativa: sem ack para "nada aconteceu", uma folga generosa é o correto aqui
+    await new Promise((resolve) => setTimeout(resolve, 200));
     expect(received).toBe(false);
 
     redisSetSpy.mockRestore();
@@ -223,8 +221,7 @@ describe("log correlation", () => {
     const rideLogSpy = vi.spyOn(socketLog, "child");
 
     const rideId = randomUUID();
-    client.emit("ride:join", { ride_id: rideId });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await joinRide(client, rideId);
 
     expect(rideLogSpy).toHaveBeenCalledWith({ rideId });
 
