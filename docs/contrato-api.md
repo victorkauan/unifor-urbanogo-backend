@@ -222,7 +222,11 @@ Só é permitido avaliar corrida `completed`, uma avaliação por parte. `score`
 
 | Método | Rota | Resposta `data` |
 |---|---|---|
-| GET | `/health` | `{ uptime_seconds, timestamp }` |
+| GET | `/health` | `{ uptime_seconds, timestamp }` (liveness, sempre 200, não checa dependências) |
+| GET | `/ready` | `{ postgres: "ok"\|"erro", redis: "ok"\|"erro" }` (200 se ambos "ok", 503 caso contrário) |
+
+`/ready` é o que o reverse proxy e os alertas (OBS-5) devem checar antes de
+considerar a instância apta a receber tráfego.
 
 ## WebSocket (Socket.IO)
 

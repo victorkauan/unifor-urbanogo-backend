@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import fp from "fastify-plugin";
 import { Server } from "socket.io";
 import { verifyToken } from "../lib/jwt.js";
+import { createPositionTracker } from "../modules/realtime/position-tracker.js";
 import { registerRealtimeGateway, type RealtimeServer } from "../modules/realtime/realtime.gateway.js";
 
 declare module "fastify" {
@@ -16,8 +18,12 @@ export const socketPlugin = fp(
     });
 
     io.use((socket, next) => {
+      const connectionId = randomUUID();
+      socket.data.connectionId = connectionId;
+
       const token = socket.handshake.auth?.token as string | undefined;
       if (!token) {
+        app.log.warn({ connectionId }, "socket handshake rejeitado: token ausente");
         next(new Error("unauthorized"));
         return;
       }
@@ -25,17 +31,21 @@ export const socketPlugin = fp(
       try {
         const { sub } = verifyToken(token);
         socket.data.userId = sub;
+        socket.data.log = app.log.child({ connectionId, userId: sub });
         next();
       } catch {
+        app.log.warn({ connectionId }, "socket handshake rejeitado: token inválido");
         next(new Error("unauthorized"));
       }
     });
 
-    registerRealtimeGateway(io);
+    const tracker = createPositionTracker(io, app.prisma, app.log);
+    registerRealtimeGateway(io, app.redis, tracker);
 
     app.decorate("io", io);
 
     app.addHook("onClose", async () => {
+      tracker.stop();
       await io.close();
     });
   },

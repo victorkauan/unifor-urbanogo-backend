@@ -1,8 +1,14 @@
+import type { FastifyBaseLogger } from "fastify";
+import type { Redis } from "ioredis";
 import type { Server, Socket } from "socket.io";
-import { rideRoomEventSchema } from "./realtime.schema.js";
+import { saveDriverLocation } from "./driver-location.repo.js";
+import type { PositionTracker } from "./position-tracker.js";
+import { driverLocationEventSchema, rideRoomEventSchema } from "./realtime.schema.js";
 
 export interface RealtimeSocketData {
+  connectionId: string;
   userId: string;
+  log: FastifyBaseLogger;
 }
 
 export type RealtimeServer = Server;
@@ -13,28 +19,58 @@ export function rideRoom(rideId: string): string {
   return `ride:${rideId}`;
 }
 
-function emitInvalidPayload(socket: RealtimeSocket) {
-  socket.emit("error", { code: "invalid_payload", message: "ride_id inválido ou ausente" });
+function socketData(socket: RealtimeSocket): RealtimeSocketData {
+  return socket.data as RealtimeSocketData;
 }
 
-export function registerRealtimeGateway(io: RealtimeServer) {
+function emitInvalidPayload(socket: RealtimeSocket, event: string, message: string) {
+  socketData(socket).log.warn({ event }, "payload de socket inválido");
+  socket.emit("error", { code: "invalid_payload", message });
+}
+
+export function registerRealtimeGateway(io: RealtimeServer, redis: Redis, tracker: PositionTracker) {
   io.on("connection", (socket: RealtimeSocket) => {
+    const { log, userId } = socketData(socket);
+    log.info("socket conectado");
+
     socket.on("ride:join", (payload: unknown) => {
       const parsed = rideRoomEventSchema.safeParse(payload);
       if (!parsed.success) {
-        emitInvalidPayload(socket);
+        emitInvalidPayload(socket, "ride:join", "ride_id inválido ou ausente");
         return;
       }
       void socket.join(rideRoom(parsed.data.ride_id));
+      log.child({ rideId: parsed.data.ride_id }).info("entrou na sala da corrida");
     });
 
     socket.on("ride:leave", (payload: unknown) => {
       const parsed = rideRoomEventSchema.safeParse(payload);
       if (!parsed.success) {
-        emitInvalidPayload(socket);
+        emitInvalidPayload(socket, "ride:leave", "ride_id inválido ou ausente");
         return;
       }
       void socket.leave(rideRoom(parsed.data.ride_id));
+      log.child({ rideId: parsed.data.ride_id }).info("saiu da sala da corrida");
+    });
+
+    socket.on("driver:location", (payload: unknown) => {
+      const parsed = driverLocationEventSchema.safeParse(payload);
+      if (!parsed.success) {
+        emitInvalidPayload(socket, "driver:location", "payload de posição inválido");
+        return;
+      }
+      saveDriverLocation(redis, userId, parsed.data)
+        .then(() => {
+          log.debug({ lat: parsed.data.lat, lng: parsed.data.lng }, "posição do motorista gravada");
+          return tracker.handleDriverLocation({ userId, location: parsed.data });
+        })
+        .catch((err: unknown) => {
+          log.error({ err }, "falha ao processar posição do motorista");
+        });
+    });
+
+    socket.on("disconnect", (reason) => {
+      log.info({ reason }, "socket desconectado");
     });
   });
 }
