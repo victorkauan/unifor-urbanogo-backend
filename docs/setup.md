@@ -10,11 +10,12 @@ máquina, com hot reload, via npm.
 ```bash
 cp .env.example .env
 npm install
-docker compose up -d
+npm run dev:up
 npm run dev
 ```
 
-API em `http://localhost:3000`, rota `GET /health`.
+`npm run dev:up` sobe a infraestrutura, espera ficar saudável, aplica as
+migrations e roda o seed. API em `http://localhost:3000`, rota `GET /health`.
 
 ## Produção
 
@@ -31,6 +32,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 | Script | O que faz |
 |---|---|
 | `npm run dev` | API em watch mode |
+| `npm run dev:up` | Sobe a infraestrutura, aplica migrations e roda o seed |
+| `npm run dev:down` | Derruba a infraestrutura |
+| `npm run dev:reset` | Derruba com volumes e sobe tudo de novo do zero |
 | `npm run build` | Compila para `dist/` |
 | `npm start` | Roda o build |
 | `npm run lint` | ESLint + Prettier (check) |
