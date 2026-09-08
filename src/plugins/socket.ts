@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fp from "fastify-plugin";
 import { Server } from "socket.io";
 import { verifyToken } from "../lib/jwt.js";
+import { createPositionTracker } from "../modules/realtime/position-tracker.js";
 import { registerRealtimeGateway, type RealtimeServer } from "../modules/realtime/realtime.gateway.js";
 
 declare module "fastify" {
@@ -38,11 +39,13 @@ export const socketPlugin = fp(
       }
     });
 
-    registerRealtimeGateway(io);
+    const tracker = createPositionTracker(io, app.prisma, app.log);
+    registerRealtimeGateway(io, app.redis, tracker);
 
     app.decorate("io", io);
 
     app.addHook("onClose", async () => {
+      tracker.stop();
       await io.close();
     });
   },
