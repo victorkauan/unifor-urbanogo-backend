@@ -31,9 +31,10 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 ```bash
 cp .env.example .env
 npm install
-docker compose up -d
+npm run dev:up
 npm run dev
 ```
 
-API em `http://localhost:3000`, rota `GET /health`. Detalhes em
-[docs/setup.md](docs/setup.md).
+`npm run dev:up` sobe PostgreSQL e Redis, aplica as migrations e popula o banco
+com dados de exemplo. API em `http://localhost:3000`, rota `GET /health`. Detalhes
+em [docs/setup.md](docs/setup.md).
