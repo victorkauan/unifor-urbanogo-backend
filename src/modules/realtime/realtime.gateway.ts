@@ -2,6 +2,7 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Redis } from "ioredis";
 import type { Server, Socket } from "socket.io";
 import { saveDriverLocation } from "./driver-location.repo.js";
+import type { PositionTracker } from "./position-tracker.js";
 import { driverLocationEventSchema, rideRoomEventSchema } from "./realtime.schema.js";
 
 export interface RealtimeSocketData {
@@ -27,7 +28,7 @@ function emitInvalidPayload(socket: RealtimeSocket, event: string, message: stri
   socket.emit("error", { code: "invalid_payload", message });
 }
 
-export function registerRealtimeGateway(io: RealtimeServer, redis: Redis) {
+export function registerRealtimeGateway(io: RealtimeServer, redis: Redis, tracker: PositionTracker) {
   io.on("connection", (socket: RealtimeSocket) => {
     const { log, userId } = socketData(socket);
     log.info("socket conectado");
@@ -61,9 +62,10 @@ export function registerRealtimeGateway(io: RealtimeServer, redis: Redis) {
       saveDriverLocation(redis, userId, parsed.data)
         .then(() => {
           log.debug({ lat: parsed.data.lat, lng: parsed.data.lng }, "posição do motorista gravada");
+          return tracker.handleDriverLocation({ userId, location: parsed.data });
         })
         .catch((err: unknown) => {
-          log.error({ err }, "falha ao gravar posição do motorista no Redis");
+          log.error({ err }, "falha ao processar posição do motorista");
         });
     });
 

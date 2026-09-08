@@ -98,6 +98,7 @@ describe("driver:location ingestion", () => {
   it("stores the driver's last known position in Redis with a TTL", async () => {
     const userId = randomUUID();
     const setSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const findFirstSpy = vi.spyOn(app.prisma.ride, "findFirst").mockResolvedValue(null);
     const client = connect(signToken({ sub: userId }));
     await waitFor(client, "connect");
 
@@ -119,10 +120,12 @@ describe("driver:location ingestion", () => {
     );
 
     setSpy.mockRestore();
+    findFirstSpy.mockRestore();
     client.close();
   });
 
   it("emits an error event for an invalid location payload", async () => {
+    const findFirstSpy = vi.spyOn(app.prisma.ride, "findFirst").mockResolvedValue(null);
     const client = connect(signToken({ sub: randomUUID() }));
     await waitFor(client, "connect");
 
@@ -130,7 +133,73 @@ describe("driver:location ingestion", () => {
     const err = await waitFor<{ code: string; message: string }>(client, "error");
 
     expect(err.code).toBe("invalid_payload");
+    findFirstSpy.mockRestore();
     client.close();
+  });
+});
+
+describe("server-side position broadcast (RT-4)", () => {
+  it("consolidates a real driver:location ping and broadcasts it to the ride room", async () => {
+    const rideId = randomUUID();
+    const driverUserId = randomUUID();
+
+    const redisSetSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const findFirstSpy = vi
+      .spyOn(app.prisma.ride, "findFirst")
+      .mockResolvedValue({ id: rideId } as never);
+
+    const passenger = connect(signToken({ sub: randomUUID() }));
+    const driver = connect(signToken({ sub: driverUserId }));
+    await Promise.all([waitFor(passenger, "connect"), waitFor(driver, "connect")]);
+
+    passenger.emit("ride:join", { ride_id: rideId });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    driver.emit("driver:location", {
+      lat: -3.73,
+      lng: -38.52,
+      heading: 90,
+      speed: 10,
+      recorded_at: new Date().toISOString(),
+    });
+
+    const msg = await waitFor<{ ride_id: string; predicted: boolean }>(passenger, "ride:driver_location");
+
+    expect(msg.ride_id).toBe(rideId);
+    expect(msg.predicted).toBe(false);
+
+    redisSetSpy.mockRestore();
+    findFirstSpy.mockRestore();
+    passenger.close();
+    driver.close();
+  });
+
+  it("does not broadcast when the driver has no active ride", async () => {
+    const driverUserId = randomUUID();
+
+    const redisSetSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const findFirstSpy = vi.spyOn(app.prisma.ride, "findFirst").mockResolvedValue(null);
+
+    const driver = connect(signToken({ sub: driverUserId }));
+    await waitFor(driver, "connect");
+
+    let received = false;
+    driver.on("ride:driver_location", () => {
+      received = true;
+    });
+
+    driver.emit("driver:location", {
+      lat: -3.73,
+      lng: -38.52,
+      recorded_at: new Date().toISOString(),
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(received).toBe(false);
+
+    redisSetSpy.mockRestore();
+    findFirstSpy.mockRestore();
+    driver.close();
   });
 });
 
