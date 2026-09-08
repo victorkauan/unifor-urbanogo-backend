@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import { buildApp, type AppInstance } from "../app.js";
 import { signToken } from "../lib/jwt.js";
+import { DRIVER_LOCATION_TTL_SECONDS, driverLocationKey } from "../modules/realtime/driver-location.repo.js";
 import { rideRoom } from "../modules/realtime/realtime.gateway.js";
 
 let app: AppInstance;
@@ -86,6 +87,46 @@ describe("ride room join/leave", () => {
     await waitFor(client, "connect");
 
     client.emit("ride:join", { ride_id: "not-a-uuid" });
+    const err = await waitFor<{ code: string; message: string }>(client, "error");
+
+    expect(err.code).toBe("invalid_payload");
+    client.close();
+  });
+});
+
+describe("driver:location ingestion", () => {
+  it("stores the driver's last known position in Redis with a TTL", async () => {
+    const userId = randomUUID();
+    const setSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const client = connect(signToken({ sub: userId }));
+    await waitFor(client, "connect");
+
+    client.emit("driver:location", {
+      lat: -3.73,
+      lng: -38.52,
+      heading: 90,
+      speed: 10,
+      recorded_at: new Date().toISOString(),
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(setSpy).toHaveBeenCalledWith(
+      driverLocationKey(userId),
+      expect.any(String),
+      "EX",
+      DRIVER_LOCATION_TTL_SECONDS,
+    );
+
+    setSpy.mockRestore();
+    client.close();
+  });
+
+  it("emits an error event for an invalid location payload", async () => {
+    const client = connect(signToken({ sub: randomUUID() }));
+    await waitFor(client, "connect");
+
+    client.emit("driver:location", { lat: 200, lng: -38.52, recorded_at: "not-a-date" });
     const err = await waitFor<{ code: string; message: string }>(client, "error");
 
     expect(err.code).toBe("invalid_payload");

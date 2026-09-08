@@ -38,7 +38,7 @@ export const socketPlugin = fp(
       }
     });
 
-    registerRealtimeGateway(io);
+    registerRealtimeGateway(io, app.redis);
 
     app.decorate("io", io);
 
