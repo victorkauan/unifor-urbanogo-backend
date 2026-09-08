@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import { buildApp, type AppInstance } from "../app.js";
 import { signToken } from "../lib/jwt.js";
@@ -89,6 +89,31 @@ describe("ride room join/leave", () => {
     const err = await waitFor<{ code: string; message: string }>(client, "error");
 
     expect(err.code).toBe("invalid_payload");
+    client.close();
+  });
+});
+
+describe("log correlation", () => {
+  it("binds connectionId/userId to the socket logger and rideId to ride:join logs", async () => {
+    const childSpy = vi.spyOn(app.log, "child");
+    const userId = randomUUID();
+    const client = connect(signToken({ sub: userId }));
+    await waitFor(client, "connect");
+
+    expect(childSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionId: expect.any(String), userId }),
+    );
+    const socketLog = childSpy.mock.results[0]?.value as { child: (...args: unknown[]) => unknown };
+    const rideLogSpy = vi.spyOn(socketLog, "child");
+
+    const rideId = randomUUID();
+    client.emit("ride:join", { ride_id: rideId });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(rideLogSpy).toHaveBeenCalledWith({ rideId });
+
+    rideLogSpy.mockRestore();
+    childSpy.mockRestore();
     client.close();
   });
 });

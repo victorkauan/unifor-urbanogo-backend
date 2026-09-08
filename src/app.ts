@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { config } from "./lib/config.js";
@@ -20,10 +21,19 @@ export async function buildApp() {
             }
           : undefined,
     },
+    genReqId(req) {
+      const upstreamId = req.headers["x-request-id"];
+      return typeof upstreamId === "string" && upstreamId.length > 0 ? upstreamId : randomUUID();
+    },
   });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  app.addHook("onSend", async (req, reply, payload) => {
+    reply.header("x-request-id", req.id);
+    return payload;
+  });
 
   await app.register(responsePlugin);
   await app.register(prismaPlugin);
