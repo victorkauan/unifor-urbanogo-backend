@@ -19,6 +19,10 @@ export function rideRoom(rideId: string): string {
   return `ride:${rideId}`;
 }
 
+export function userRoom(userId: string): string {
+  return `user:${userId}`;
+}
+
 function socketData(socket: RealtimeSocket): RealtimeSocketData {
   return socket.data as RealtimeSocketData;
 }
@@ -35,6 +39,7 @@ export function registerRealtimeGateway(
 ) {
   io.on("connection", (socket: RealtimeSocket) => {
     const { log, userId } = socketData(socket);
+    void socket.join(userRoom(userId));
     log.info("socket conectado");
 
     socket.on("ride:join", (payload: unknown, ack?: (result: { ok: boolean }) => void) => {
