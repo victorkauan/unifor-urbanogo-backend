@@ -4,6 +4,7 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    mem_limit: 512m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-urbanogo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
@@ -19,6 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    mem_limit: 256m
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
@@ -32,9 +34,11 @@ services:
     build:
       context: .
       target: runtime
+    image: urbanogo-api
     restart: unless-stopped
-    ports:
-      - "${API_PORT:-3000}:3000"
+    mem_limit: 512m
+    expose:
+      - "3000"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -43,17 +47,44 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-urbanogo}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-urbanogo}?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
+  migrate:
+    build:
+      context: .
+      target: runtime
+    image: urbanogo-api
+    profiles: ["tools"]
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-urbanogo}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-urbanogo}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
+    mem_limit: 512m
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./observability/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -63,10 +94,12 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     restart: unless-stopped
-    ports:
-      - "3001:3000"
+    mem_limit: 384m
+    expose:
+      - "3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_ROOT_URL: https://grafana.${PUBLIC_HOST:?defina PUBLIC_HOST}
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:?defina ALERT_WEBHOOK_URL (webhook do canal do time)}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -75,8 +108,27 @@ services:
     depends_on:
       - prometheus
 
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?defina PUBLIC_HOST}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - grafana
+
 volumes:
   db_data:
   redis_data:
   prometheus_data:
   grafana_data:
+  caddy_data:
+  caddy_config:
