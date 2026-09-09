@@ -235,10 +235,12 @@ describe.runIf(shouldRun)("ride request routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().data.ride.status).toBe("cancelled");
+    expect(res.json().data.ride.cancellation_reason).toBe("mudei de ideia");
     const stored = await app.prisma.ride.findUnique({ where: { id: rideId } });
     expect(stored?.status).toBe("cancelled");
     expect(stored?.cancelledBy).toBe("passenger");
     expect(stored?.cancelledAt).not.toBeNull();
+    expect(stored?.cancelledReason).toBe("mudei de ideia");
   });
 
   it("lets the assigned driver cancel the ride", async () => {

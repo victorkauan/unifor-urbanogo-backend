@@ -53,6 +53,7 @@ erDiagram
         timestamptz completed_at
         timestamptz cancelled_at
         CancelledBy cancelled_by
+        text cancelled_reason "nullable"
     }
     ride_offers {
         uuid id PK

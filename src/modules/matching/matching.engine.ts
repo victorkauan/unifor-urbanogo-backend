@@ -219,8 +219,9 @@ export class MatchingEngine {
   async cancel(
     rideId: string,
     cancelledBy: "passenger" | "driver" | "system" = "system",
+    reason?: string | null,
   ): Promise<void> {
-    await this.fail(rideId, "cancelled", cancelledBy);
+    await this.fail(rideId, "cancelled", cancelledBy, reason);
   }
 
   private async offerNext(rideId: string): Promise<void> {
@@ -301,6 +302,7 @@ export class MatchingEngine {
     rideId: string,
     reason: MatchingFailureReason,
     cancelledBy: "passenger" | "driver" | "system" = "system",
+    cancelledReason?: string | null,
   ): Promise<void> {
     const state = await getSearchState(this.redis, rideId);
     if (state && state.status !== "searching") {
@@ -323,7 +325,12 @@ export class MatchingEngine {
         where: { id: rideId },
         data:
           nextStatus === "cancelled"
-            ? { status: "cancelled", cancelledBy, cancelledAt: new Date(this.now()) }
+            ? {
+                status: "cancelled",
+                cancelledBy,
+                cancelledAt: new Date(this.now()),
+                cancelledReason: cancelledReason ?? null,
+              }
             : { status: "expired" },
       });
     }

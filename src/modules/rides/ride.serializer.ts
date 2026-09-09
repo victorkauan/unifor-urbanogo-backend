@@ -46,5 +46,6 @@ export function serializeRide(ride: RideForResponse, options: SerializeRideOptio
     completed_at: ride.completedAt?.toISOString() ?? null,
     cancelled_at: ride.cancelledAt?.toISOString() ?? null,
     cancelled_by: ride.cancelledBy ?? null,
+    cancellation_reason: ride.cancelledReason ?? null,
   };
 }

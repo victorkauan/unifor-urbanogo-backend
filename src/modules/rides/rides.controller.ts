@@ -161,7 +161,9 @@ export async function cancelRide(req: FastifyRequest, reply: FastifyReply) {
   }
 
   const { rideId } = req.params as { rideId: string };
-  const { reason } = (req.body ?? {}) as { reason?: string };
+  const rawReason = (req.body ?? {}) as { reason?: unknown };
+  const reason =
+    typeof rawReason.reason === "string" ? rawReason.reason.trim().slice(0, 500) || null : null;
 
   const ride = await req.server.prisma.ride.findUnique({
     where: { id: rideId },
@@ -187,7 +189,7 @@ export async function cancelRide(req: FastifyRequest, reply: FastifyReply) {
   }
 
   if (ride.status === "searching") {
-    await req.server.matching.cancel(rideId, cancelledBy);
+    await req.server.matching.cancel(rideId, cancelledBy, reason);
   } else {
     assertRideTransition(ride.status, "cancelled");
     await req.server.prisma.ride.update({
@@ -196,6 +198,7 @@ export async function cancelRide(req: FastifyRequest, reply: FastifyReply) {
         status: "cancelled",
         cancelledBy,
         cancelledAt: new Date(),
+        cancelledReason: reason,
         updatedById: userId,
       },
     });
