@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { config } from "./lib/config.js";
@@ -5,8 +6,12 @@ import { AppError } from "./lib/errors.js";
 import { responsePlugin } from "./lib/response.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
+import { socketPlugin } from "./plugins/socket.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import { userRoutes } from "./modules/users/users.routes.js";
+import { driverRoutes } from "./modules/drivers/drivers.routes.js";
+import { ratingRoutes } from "./modules/ratings/ratings.routes.js";
+import { authRoutes } from "./modules/auth/auth.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -20,17 +25,32 @@ export async function buildApp() {
             }
           : undefined,
     },
+    genReqId(req) {
+      const upstreamId = req.headers["x-request-id"];
+      return typeof upstreamId === "string" && upstreamId.length > 0 ? upstreamId : randomUUID();
+    },
   });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  app.addHook("onSend", async (req, reply, payload) => {
+    reply.header("x-request-id", req.id);
+    return payload;
+  });
+
   await app.register(responsePlugin);
   await app.register(prismaPlugin);
   await app.register(redisPlugin);
+  await app.register(socketPlugin);
 
   await app.register(healthRoutes);
   await app.register(userRoutes, { prefix: "/users" });
+  await app.register(authRoutes, { prefix: "/auth" });
+
+  await app.register(ratingRoutes, { prefix: "/ratings" });
+
+  await app.register(driverRoutes, { prefix: "/drivers" });
 
   app.setNotFoundHandler((req, reply) => {
     reply.fail(404, `Rota não encontrada: ${req.method} ${req.url}`);

@@ -31,3 +31,23 @@ describe("unknown route", () => {
     expect(res.json()).toMatchObject({ status_code: 404, data: null });
   });
 });
+
+describe("x-request-id correlation", () => {
+  it("generates a request id and echoes it back as a response header", async () => {
+    const res = await app.inject({ method: "GET", url: "/health" });
+
+    expect(res.headers["x-request-id"]).toEqual(expect.any(String));
+    expect((res.headers["x-request-id"] as string).length).toBeGreaterThan(0);
+  });
+
+  it("reuses a client-provided x-request-id instead of generating a new one", async () => {
+    const requestId = "11111111-1111-1111-1111-111111111111";
+    const res = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { "x-request-id": requestId },
+    });
+
+    expect(res.headers["x-request-id"]).toBe(requestId);
+  });
+});
