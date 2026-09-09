@@ -119,6 +119,7 @@ model Ride {
   priceBreakdown  Json?        @map("price_breakdown")
   requestedAt     DateTime     @default(now()) @map("requested_at") @db.Timestamptz(6)
   assignedAt      DateTime?    @map("assigned_at") @db.Timestamptz(6)
+  arrivedAt       DateTime?    @map("arrived_at") @db.Timestamptz(6)
   startedAt       DateTime?    @map("started_at") @db.Timestamptz(6)
   completedAt     DateTime?    @map("completed_at") @db.Timestamptz(6)
   cancelledAt     DateTime?    @map("cancelled_at") @db.Timestamptz(6)

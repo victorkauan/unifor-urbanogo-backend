@@ -55,6 +55,41 @@ describe("quotePrice", () => {
     expect(quote.price_cents).toBeGreaterThan(0);
   });
 
+  it("applies the demand multiplier when a demand ratio is resolved", async () => {
+    const quote = await quotePrice(
+      { origin: ORIGIN, destination: DESTINATION },
+      { now: OFF_PEAK, resolveWeather: async () => undefined, resolveDemandRatio: async () => 2 },
+    );
+    expect(quote.price_breakdown.multipliers.demand).toBe(1.6);
+  });
+
+  it("keeps the demand multiplier neutral when there is no demand signal", async () => {
+    const quote = await quotePrice(
+      { origin: ORIGIN, destination: DESTINATION },
+      {
+        now: OFF_PEAK,
+        resolveWeather: async () => undefined,
+        resolveDemandRatio: async () => undefined,
+      },
+    );
+    expect(quote.price_breakdown.multipliers.demand).toBe(1);
+  });
+
+  it("degrades gracefully when the demand lookup throws", async () => {
+    const quote = await quotePrice(
+      { origin: ORIGIN, destination: DESTINATION },
+      {
+        now: OFF_PEAK,
+        resolveWeather: async () => undefined,
+        resolveDemandRatio: async () => {
+          throw new Error("redis down");
+        },
+      },
+    );
+    expect(quote.price_breakdown.multipliers.demand).toBe(1);
+    expect(quote.price_cents).toBeGreaterThan(0);
+  });
+
   it("sets an expiry a fixed window ahead", async () => {
     const quote = await quotePrice(
       { origin: ORIGIN, destination: DESTINATION },

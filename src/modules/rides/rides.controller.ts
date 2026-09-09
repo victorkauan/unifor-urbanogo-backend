@@ -4,10 +4,52 @@ import { authUserId } from "../auth/auth-user.js";
 import { haversineKm } from "../../lib/geo.js";
 import { createSocketMatchingNotifier } from "../matching/matching.notifier.js";
 import { calculateFare } from "../pricing/pricing.service.js";
-import { rideResponseInclude, serializeRide } from "./ride.serializer.js";
+import { recordRideRequest } from "../realtime/demand-signal.repo.js";
+import { rideResponseInclude, serializeRide, type RideForResponse } from "./ride.serializer.js";
 import { assertRideTransition, isTerminalRideStatus } from "./ride-state-machine.js";
 
 const ACTIVE_RIDE_STATUSES = ["requested", "searching", "assigned", "in_progress"] as const;
+
+function broadcastRideStatus(req: FastifyRequest, ride: RideForResponse) {
+  createSocketMatchingNotifier(req.server.io).statusToRide(ride.id, {
+    ride_id: ride.id,
+    status: ride.status,
+    driver: ride.driver
+      ? {
+          id: ride.driver.id,
+          name: ride.driver.user.name,
+          vehicle_model: ride.driver.vehicleModel,
+          vehicle_plate: ride.driver.vehiclePlate,
+        }
+      : undefined,
+    arrived_at: ride.arrivedAt?.toISOString() ?? null,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+async function requireAssignedDriverRide(req: FastifyRequest, reply: FastifyReply) {
+  const userId = authUserId(req);
+  if (!userId) {
+    reply.fail(401, "Não autenticado");
+    return null;
+  }
+
+  const { rideId } = req.params as { rideId: string };
+  const ride = await req.server.prisma.ride.findUnique({
+    where: { id: rideId },
+    include: { driver: { select: { userId: true } } },
+  });
+  if (!ride) {
+    reply.fail(404, "Corrida não encontrada");
+    return null;
+  }
+  if (ride.driver?.userId !== userId) {
+    reply.fail(403, "Você não é o motorista desta corrida");
+    return null;
+  }
+
+  return { userId, ride };
+}
 
 interface GeoPointInput {
   lat: number;
@@ -73,6 +115,10 @@ export async function createRide(req: FastifyRequest, reply: FastifyReply) {
 
   void req.server.matching.start(created.id).catch((err: unknown) => {
     req.log.error({ err, rideId: created.id }, "falha ao iniciar o matching");
+  });
+
+  void recordRideRequest(req.server.redis, origin).catch((err: unknown) => {
+    req.log.error({ err, rideId: created.id }, "falha ao registrar sinal de demanda");
   });
 
   const ride = await req.server.prisma.ride.findUniqueOrThrow({
@@ -209,20 +255,90 @@ export async function cancelRide(req: FastifyRequest, reply: FastifyReply) {
     include: rideResponseInclude,
   });
 
-  createSocketMatchingNotifier(req.server.io).statusToRide(rideId, {
-    ride_id: rideId,
-    status: full.status,
-    driver: full.driver
-      ? {
-          id: full.driver.id,
-          name: full.driver.user.name,
-          vehicle_model: full.driver.vehicleModel,
-          vehicle_plate: full.driver.vehiclePlate,
-        }
-      : undefined,
-    updated_at: new Date().toISOString(),
-  });
+  broadcastRideStatus(req, full);
 
   req.log.info({ rideId, cancelledBy, reason }, "corrida cancelada");
   return reply.ok({ ride: serializeRide(full) }, "Corrida cancelada");
+}
+
+export async function arriveRide(req: FastifyRequest, reply: FastifyReply) {
+  const found = await requireAssignedDriverRide(req, reply);
+  if (!found) {
+    return;
+  }
+  const { ride } = found;
+
+  if (ride.status !== "assigned") {
+    return reply.fail(409, "A corrida precisa estar atribuída para marcar chegada", {
+      status: ride.status,
+    });
+  }
+  if (ride.arrivedAt) {
+    return reply.fail(409, "Chegada já registrada");
+  }
+
+  await req.server.prisma.ride.update({
+    where: { id: ride.id },
+    data: { arrivedAt: new Date(), updatedById: found.userId },
+  });
+
+  const full = await req.server.prisma.ride.findUniqueOrThrow({
+    where: { id: ride.id },
+    include: rideResponseInclude,
+  });
+  broadcastRideStatus(req, full);
+
+  req.log.info({ rideId: ride.id }, "motorista chegou na origem");
+  return reply.ok({ ride: serializeRide(full) }, "Chegada registrada");
+}
+
+export async function startRide(req: FastifyRequest, reply: FastifyReply) {
+  const found = await requireAssignedDriverRide(req, reply);
+  if (!found) {
+    return;
+  }
+  const { ride } = found;
+
+  if (!ride.arrivedAt) {
+    return reply.fail(409, "O motorista precisa marcar chegada antes de iniciar a corrida");
+  }
+  assertRideTransition(ride.status, "in_progress");
+
+  await req.server.prisma.ride.update({
+    where: { id: ride.id },
+    data: { status: "in_progress", startedAt: new Date(), updatedById: found.userId },
+  });
+
+  const full = await req.server.prisma.ride.findUniqueOrThrow({
+    where: { id: ride.id },
+    include: rideResponseInclude,
+  });
+  broadcastRideStatus(req, full);
+
+  req.log.info({ rideId: ride.id }, "corrida iniciada");
+  return reply.ok({ ride: serializeRide(full) }, "Corrida iniciada");
+}
+
+export async function completeRide(req: FastifyRequest, reply: FastifyReply) {
+  const found = await requireAssignedDriverRide(req, reply);
+  if (!found) {
+    return;
+  }
+  const { ride } = found;
+
+  assertRideTransition(ride.status, "completed");
+
+  await req.server.prisma.ride.update({
+    where: { id: ride.id },
+    data: { status: "completed", completedAt: new Date(), updatedById: found.userId },
+  });
+
+  const full = await req.server.prisma.ride.findUniqueOrThrow({
+    where: { id: ride.id },
+    include: rideResponseInclude,
+  });
+  broadcastRideStatus(req, full);
+
+  req.log.info({ rideId: ride.id }, "corrida concluída");
+  return reply.ok({ ride: serializeRide(full) }, "Corrida concluída");
 }

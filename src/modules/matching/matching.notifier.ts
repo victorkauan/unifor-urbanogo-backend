@@ -21,6 +21,7 @@ export interface RideStatusPayload {
   ride_id: string;
   status: string;
   driver?: { id: string; name: string; vehicle_model: string | null; vehicle_plate: string | null };
+  arrived_at?: string | null;
   updated_at: string;
 }
 

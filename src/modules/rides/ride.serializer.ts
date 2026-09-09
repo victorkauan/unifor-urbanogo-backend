@@ -42,6 +42,7 @@ export function serializeRide(ride: RideForResponse, options: SerializeRideOptio
     price_breakdown: ride.priceBreakdown ?? null,
     requested_at: ride.requestedAt.toISOString(),
     assigned_at: ride.assignedAt?.toISOString() ?? null,
+    arrived_at: ride.arrivedAt?.toISOString() ?? null,
     started_at: ride.startedAt?.toISOString() ?? null,
     completed_at: ride.completedAt?.toISOString() ?? null,
     cancelled_at: ride.cancelledAt?.toISOString() ?? null,

@@ -21,16 +21,21 @@ export interface QuoteResult {
 export interface QuoteDeps {
   now?: () => number;
   resolveWeather?: (point: LatLng) => Promise<WeatherCondition | undefined>;
+  resolveDemandRatio?: (point: LatLng) => Promise<number | undefined>;
 }
 
 export async function quotePrice(input: QuoteInput, deps: QuoteDeps = {}): Promise<QuoteResult> {
   const now = deps.now ?? (() => Date.now());
   const resolveWeather =
     deps.resolveWeather ?? ((point) => fetchCurrentWeather(point.lat, point.lng));
+  const resolveDemandRatio = deps.resolveDemandRatio ?? (() => Promise.resolve(undefined));
 
   const distanceMeters = Math.round(haversineKm(input.origin, input.destination) * 1000);
-  const weather = await resolveWeather(input.origin).catch(() => undefined);
-  const multipliers = combineMultipliers({ at: new Date(now()), weather });
+  const [weather, demandRatio] = await Promise.all([
+    resolveWeather(input.origin).catch(() => undefined),
+    resolveDemandRatio(input.origin).catch(() => undefined),
+  ]);
+  const multipliers = combineMultipliers({ at: new Date(now()), weather, demandRatio });
   const fare = calculateFare({ distanceMeters, multipliers });
 
   return {
