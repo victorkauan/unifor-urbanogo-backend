@@ -1,89 +1,107 @@
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import OpenAI from "openai";
+import { config } from "../../lib/config.js";
 
-const prisma = new PrismaClient();
+const LLM_BASE_URL = "https://api.deepinfra.com/v1/openai";
+const LLM_TIMEOUT_MS = 5000;
+const RATING_HISTORY_SIZE = 20;
 
-export async function getTrustScore(userId: string): Promise<number> {
+type TrustScoreSource = "stub" | "llm";
+
+type RatingHistoryEntry = {
+  score: number;
+  comment: string | null;
+  createdAt: Date;
+};
+
+export function normalizeRatingAverage(average: number | null): number {
+  if (average === null || !Number.isFinite(average)) {
+    return 1;
+  }
+  return Math.min(1, Math.max(0, (average - 1) / 4));
+}
+
+async function persistTrustScore(
+  prisma: PrismaClient,
+  userId: string,
+  score: number,
+  source: TrustScoreSource,
+): Promise<void> {
+  await prisma.trustScore.upsert({
+    where: { userId },
+    update: { score, source, computedAt: new Date() },
+    create: { userId, score, source, computedAt: new Date() },
+  });
+}
+
+async function analyzeWithLlm(ratings: RatingHistoryEntry[]): Promise<number | null> {
+  const client = new OpenAI({ baseURL: LLM_BASE_URL, apiKey: config.DEEPINFRA_API_KEY });
+
+  const response = await client.chat.completions.create(
+    {
+      model: config.DEEPINFRA_TRUST_MODEL,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            'Analyze the rating history of a mobility app user and detect recent drops in service quality that a plain average would hide. Respond only with JSON shaped as {"score": number, "reason": "string"} where score is between 0.0 and 1.0.',
+        },
+        { role: "user", content: JSON.stringify(ratings) },
+      ],
+    },
+    { timeout: LLM_TIMEOUT_MS },
+  );
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    return null;
+  }
+
+  const parsed = JSON.parse(content) as { score?: unknown };
+  if (typeof parsed.score !== "number" || !Number.isFinite(parsed.score)) {
+    return null;
+  }
+
+  return Math.min(1, Math.max(0, parsed.score));
+}
+
+export async function getTrustScore(prisma: PrismaClient, userId: string): Promise<number> {
   const aggregation = await prisma.rating.aggregate({
     _avg: { score: true },
-    where: { rateeId: userId },
+    where: { rateeId: userId, deletedAt: null },
   });
 
-  const fallbackScore = aggregation._avg.score || 5.0;
+  const fallbackScore = normalizeRatingAverage(aggregation._avg.score);
 
-  if (!process.env.DEEPINFRA_API_KEY) {
-    await saveScore(userId, fallbackScore, "stub");
+  if (!config.DEEPINFRA_API_KEY) {
+    await persistTrustScore(prisma, userId, fallbackScore, "stub");
     return fallbackScore;
   }
 
   const ratings = await prisma.rating.findMany({
-    where: { rateeId: userId },
+    where: { rateeId: userId, deletedAt: null },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: RATING_HISTORY_SIZE,
     select: { score: true, comment: true, createdAt: true },
   });
 
   if (ratings.length === 0) {
-    await saveScore(userId, fallbackScore, "stub");
+    await persistTrustScore(prisma, userId, fallbackScore, "stub");
     return fallbackScore;
   }
 
   try {
-    const openai = new OpenAI({
-      baseURL: "https://api.deepinfra.com/v1/openai",
-      apiKey: process.env.DEEPINFRA_API_KEY,
-    });
-
-    const response = await openai.chat.completions.create(
-      {
-        model: "meta-llama/Meta-Llama-3-70B-Instruct",
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              'Analyze the user rating history. Look for recent quality drops. Output a valid JSON exactly like this: {"score": number, "reason": "string"}. The "score" must be between 0.0 and 1.0.',
-          },
-          {
-            role: "user",
-            content: JSON.stringify(ratings),
-          },
-        ],
-      },
-      { timeout: 5000 },
-    );
-
-    const content = response.choices[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("Empty response");
+    const llmScore = await analyzeWithLlm(ratings);
+    if (llmScore === null) {
+      await persistTrustScore(prisma, userId, fallbackScore, "stub");
+      return fallbackScore;
     }
 
-    const parsed = JSON.parse(content);
-    const llmScore = typeof parsed.score === "number" ? parsed.score * 5 : fallbackScore;
-    const finalScore = Math.max(1, Math.min(5, llmScore));
-
-    await saveScore(userId, finalScore, "llm");
-    return finalScore;
+    await persistTrustScore(prisma, userId, llmScore, "llm");
+    return llmScore;
   } catch {
-    await saveScore(userId, fallbackScore, "stub");
+    await persistTrustScore(prisma, userId, fallbackScore, "stub");
     return fallbackScore;
   }
-}
-
-async function saveScore(userId: string, score: number, source: "stub" | "llm") {
-  await prisma.trustScore.upsert({
-    where: { userId },
-    update: {
-      score,
-      source,
-      computedAt: new Date(),
-    },
-    create: {
-      userId,
-      score,
-      source,
-      computedAt: new Date(),
-    },
-  });
 }

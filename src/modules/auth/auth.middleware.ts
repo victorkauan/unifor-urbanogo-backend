@@ -1,26 +1,32 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import jwt from "jsonwebtoken";
+import { verifyToken } from "../../lib/jwt.js";
 
-// Expande a interface original do Fastify para incluir a propriedade 'user'
 declare module "fastify" {
   interface FastifyRequest {
-    user?: string | jwt.JwtPayload;
+    user?: { id: string; sub: string };
   }
 }
 
-export async function verifyJwt(req: FastifyRequest, reply: FastifyReply) {
-  const authHeader = req.headers.authorization;
+const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
 
-  if (!authHeader) {
-    return reply.fail(401, "Token not provided");
+export function extractBearerToken(header: string | undefined): string | null {
+  if (!header) {
+    return null;
+  }
+  const token = BEARER_PATTERN.exec(header.trim())?.[1]?.trim();
+  return token && token.length > 0 ? token : null;
+}
+
+export async function verifyJwt(req: FastifyRequest, reply: FastifyReply) {
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) {
+    return reply.fail(401, "Token não informado");
   }
 
-  const token = authHeader.replace("Bearer ", "");
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-    req.user = decoded;
+    const { sub } = verifyToken(token);
+    req.user = { id: sub, sub };
   } catch {
-    return reply.fail(401, "Invalid or expired token");
+    return reply.fail(401, "Token inválido ou expirado");
   }
 }

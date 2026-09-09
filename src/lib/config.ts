@@ -9,6 +9,8 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   JWT_SECRET: z.string().min(16),
+  DEEPINFRA_API_KEY: z.string().min(1).optional(),
+  DEEPINFRA_TRUST_MODEL: z.string().default("meta-llama/Meta-Llama-3.3-70B-Instruct"),
 });
 
 const parsed = schema.safeParse(process.env);

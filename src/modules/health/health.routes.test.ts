@@ -34,7 +34,7 @@ describe("GET /ready", () => {
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({
       status_code: 503,
-      data: { postgres: "erro", redis: "ok" },
+      data: { postgres: "error", redis: "ok" },
     });
   });
 
@@ -49,7 +49,7 @@ describe("GET /ready", () => {
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({
       status_code: 503,
-      data: { postgres: "ok", redis: "erro" },
+      data: { postgres: "ok", redis: "error" },
     });
   });
 });

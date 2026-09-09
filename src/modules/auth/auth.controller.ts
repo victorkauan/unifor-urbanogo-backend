@@ -1,59 +1,69 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import bcrypt from "bcryptjs";
+import { signToken } from "../../lib/jwt.js";
+import { serializeUser } from "../users/user.serializer.js";
+import { authUserId } from "./auth-user.js";
 
-type RegisterBody = {
+const BCRYPT_ROUNDS = 10;
+const TOKEN_TTL = "7d";
+
+interface RegisterBody {
   name: string;
   email: string;
   password: string;
+  phone?: string;
   role: "passenger" | "driver" | "both";
-};
+}
 
-type LoginBody = {
+interface LoginBody {
   email: string;
   password: string;
-};
+}
 
-export async function register(req: FastifyRequest<{ Body: RegisterBody }>, reply: FastifyReply) {
-  const { name, email, password, role } = req.body;
+export async function register(req: FastifyRequest, reply: FastifyReply) {
+  const { name, email, password, phone, role } = req.body as RegisterBody;
 
-  const userExists = await prisma.user.findUnique({ where: { email } });
-  if (userExists) {
-    return reply.fail(409, "Email already in use");
+  const existing = await req.server.prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return reply.fail(409, "E-mail já cadastrado");
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  const user = await prisma.user.create({
+  const user = await req.server.prisma.user.create({
     data: {
       name,
       email,
-      passwordHash,
+      phone: phone ?? null,
       role,
+      passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS),
     },
   });
 
-  return reply.status(201).send({ id: user.id, email: user.email, role: user.role });
+  const token = signToken({ sub: user.id }, TOKEN_TTL);
+  return reply.ok({ user: serializeUser(user), token }, "Conta criada", 201);
 }
 
-export async function login(req: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) {
-  const { email, password } = req.body;
+export async function login(req: FastifyRequest, reply: FastifyReply) {
+  const { email, password } = req.body as LoginBody;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await req.server.prisma.user.findFirst({ where: { email, deletedAt: null } });
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    return reply.fail(401, "Credenciais inválidas");
+  }
+
+  const token = signToken({ sub: user.id }, TOKEN_TTL);
+  return reply.ok({ user: serializeUser(user), token }, "Login efetuado");
+}
+
+export async function me(req: FastifyRequest, reply: FastifyReply) {
+  const userId = authUserId(req);
+  if (!userId) {
+    return reply.fail(401, "Não autenticado");
+  }
+
+  const user = await req.server.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
   if (!user) {
-    return reply.fail(401, "Invalid credentials");
+    return reply.fail(401, "Conta inválida");
   }
 
-  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
-  if (!isPasswordValid) {
-    return reply.fail(401, "Invalid credentials");
-  }
-
-  const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET as string, {
-    expiresIn: "7d",
-  });
-
-  return reply.send({ token });
+  return reply.ok({ user: serializeUser(user) }, "Usuário atual");
 }

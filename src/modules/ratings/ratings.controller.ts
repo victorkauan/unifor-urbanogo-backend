@@ -1,105 +1,90 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { authUserId } from "../auth/auth-user.js";
+import { trustScoreCacheKey } from "../trust-score/trust-score.cache.js";
+import { serializeRating } from "./rating.serializer.js";
 
-type CreateRatingBody = {
-  rideId: string;
+interface CreateRatingBody {
   score: number;
   comment?: string;
-};
+}
 
-type GetUserRatingsParams = {
-  userId: string;
-};
-
-export async function createRating(
-  req: FastifyRequest<{ Body: CreateRatingBody }>,
-  reply: FastifyReply,
-) {
-  const { rideId, score, comment } = req.body;
-  const raterId = (req as FastifyRequest & { user?: { id: string } }).user?.id;
-
+export async function createRating(req: FastifyRequest, reply: FastifyReply) {
+  const raterId = authUserId(req);
   if (!raterId) {
-    return reply.fail(401, "User not authenticated");
+    return reply.fail(401, "Não autenticado");
+  }
+
+  const { rideId } = req.params as { rideId: string };
+  const { score, comment } = req.body as CreateRatingBody;
+
+  const ride = await req.server.prisma.ride.findUnique({
+    where: { id: rideId },
+    include: { driver: { select: { userId: true } } },
+  });
+  if (!ride) {
+    return reply.fail(404, "Corrida não encontrada");
+  }
+  if (ride.status !== "completed") {
+    return reply.fail(409, "Só é possível avaliar corridas concluídas");
+  }
+
+  const driverUserId = ride.driver?.userId;
+  let rateeId: string | undefined;
+  if (raterId === ride.passengerId) {
+    rateeId = driverUserId;
+  } else if (raterId === driverUserId) {
+    rateeId = ride.passengerId;
+  } else {
+    return reply.fail(403, "Você não faz parte desta corrida");
+  }
+  if (!rateeId) {
+    return reply.fail(409, "Corrida sem motorista para avaliar");
   }
 
   try {
-    const ride = await prisma.ride.findUnique({
-      where: { id: rideId },
-      include: { driver: true },
-    });
-
-    if (!ride) {
-      return reply.fail(404, "Ride not found");
-    }
-
-    if (ride.status !== "completed") {
-      return reply.fail(400, "You can only rate completed rides");
-    }
-
-    const passengerId = ride.passengerId;
-    const driverUserId = ride.driver?.userId;
-
-    let rateeId;
-    if (raterId === passengerId) {
-      rateeId = driverUserId;
-    } else if (raterId === driverUserId) {
-      rateeId = passengerId;
-    } else {
-      return reply.fail(403, "You are not part of this ride");
-    }
-
-    if (!rateeId) {
-      return reply.fail(400, "Cannot rate a ride without a driver");
-    }
-
-    const rating = await prisma.rating.create({
+    const rating = await req.server.prisma.rating.create({
       data: {
         rideId,
         raterId,
         rateeId,
         score,
-        comment,
+        comment: comment ?? null,
         createdById: raterId,
         updatedById: raterId,
       },
     });
-
-    return reply.status(201).send(rating);
-  } catch (error: unknown) {
-    const err = error as { code?: string };
-
-    if (err.code === "P2002") {
-      return reply.fail(409, "You have already rated this ride");
+    void req.server.redis.del(trustScoreCacheKey(rateeId)).catch(() => {});
+    return reply.ok({ rating: serializeRating(rating) }, "Avaliação registrada", 201);
+  } catch (error) {
+    if ((error as { code?: string }).code === "P2002") {
+      return reply.fail(409, "Você já avaliou esta corrida");
     }
     throw error;
   }
 }
 
-export async function getUserRatings(
-  req: FastifyRequest<{ Params: GetUserRatingsParams }>,
-  reply: FastifyReply,
-) {
-  const { userId } = req.params;
+export async function getUserRatings(req: FastifyRequest, reply: FastifyReply) {
+  const requesterId = authUserId(req);
+  if (!requesterId) {
+    return reply.fail(401, "Não autenticado");
+  }
 
-  const ratings = await prisma.rating.findMany({
-    where: { rateeId: userId },
-    include: {
-      rater: { select: { id: true, name: true } },
-      ride: { select: { id: true, type: true, completedAt: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const { userId } = req.params as { userId: string };
+  const { page, page_size } = req.query as { page: number; page_size: number };
 
-  const aggregation = await prisma.rating.aggregate({
-    _avg: { score: true },
-    _count: { id: true },
-    where: { rateeId: userId },
-  });
+  const where = { rateeId: userId, deletedAt: null };
+  const [total, ratings] = await req.server.prisma.$transaction([
+    req.server.prisma.rating.count({ where }),
+    req.server.prisma.rating.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * page_size,
+      take: page_size,
+    }),
+  ]);
 
-  return reply.send({
-    averageScore: aggregation._avg.score || 0,
-    totalRatings: aggregation._count.id,
-    ratings,
-  });
+  return reply.ok(
+    { items: ratings.map(serializeRating), page, page_size, total },
+    "Avaliações do usuário",
+  );
 }
