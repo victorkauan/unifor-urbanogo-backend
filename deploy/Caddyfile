@@ -4,11 +4,15 @@
 #
 # PUBLIC_HOST vem do .env (ex.: 203-0-113-10.sslip.io).
 
-{$PUBLIC_HOST} {
-	# /metrics e servido sem autenticacao pela API; o Prometheus le pela
-	# rede interna do Compose. Bloqueado na borda.
+# /metrics (API e Grafana) e servido sem autenticacao; o Prometheus le pela
+# rede interna do Compose. Bloqueado na borda em todos os hosts.
+(block-metrics) {
 	@metrics path /metrics /metrics/*
 	respond @metrics 403
+}
+
+{$PUBLIC_HOST} {
+	import block-metrics
 
 	reverse_proxy api:3000
 
@@ -20,6 +24,8 @@
 }
 
 grafana.{$PUBLIC_HOST} {
+	import block-metrics
+
 	reverse_proxy grafana:3000
 
 	encode gzip
