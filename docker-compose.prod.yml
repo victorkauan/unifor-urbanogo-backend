@@ -67,6 +67,7 @@ services:
       - "3001:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?defina GRAFANA_ADMIN_PASSWORD}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:?defina ALERT_WEBHOOK_URL (webhook do canal do time)}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro

@@ -45,6 +45,9 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # URL de webhook (Slack, Discord, etc.) pro canal do time. Sem isso, os
+      # alertas ainda funcionam, só não notificam ninguém.
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-https://example.invalid/configure-alert-webhook-url}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
