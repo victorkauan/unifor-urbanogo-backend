@@ -1,0 +1,18 @@
+# Copie para group_vars/all.yml para rodar o playbook a mao.
+# No GitHub Actions esses valores chegam por variaveis de ambiente
+# (ver .github/workflows/deploy.yml e docs/deploy.md); nao versione segredos.
+
+app_dir: /opt/urbanogo
+repo_url: https://github.com/victorkauan/unifor-urbanogo-backend.git
+git_version: develop
+app_user: deploy
+
+# Host publico (mesmo valor de PUBLIC_HOST no .env).
+public_host: 203-0-113-10.sslip.io
+
+# Segredos: deixe em branco aqui e passe por env / --extra-vars.
+postgres_password: ""
+jwt_secret: ""
+grafana_admin_password: ""
+alert_webhook_url: ""
+deepinfra_api_key: ""
