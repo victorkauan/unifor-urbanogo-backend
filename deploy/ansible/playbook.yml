@@ -1,0 +1,175 @@
+- name: Provision and deploy the UrbanoGo MVP
+  hosts: urbanogo
+  become: true
+  gather_facts: true
+
+  vars:
+    app_dir: /opt/urbanogo
+    repo_url: https://github.com/victorkauan/unifor-urbanogo-backend.git
+    git_version: develop
+    app_user: deploy
+    deepinfra_api_key: ""
+
+  pre_tasks:
+    - name: Take secrets and target ref from the environment when present
+      ansible.builtin.set_fact:
+        public_host: "{{ lookup('ansible.builtin.env', 'PUBLIC_HOST') | default(public_host | default(''), true) }}"
+        postgres_password: "{{ lookup('ansible.builtin.env', 'POSTGRES_PASSWORD') | default(postgres_password | default(''), true) }}"
+        jwt_secret: "{{ lookup('ansible.builtin.env', 'JWT_SECRET') | default(jwt_secret | default(''), true) }}"
+        grafana_admin_password: "{{ lookup('ansible.builtin.env', 'GRAFANA_ADMIN_PASSWORD') | default(grafana_admin_password | default(''), true) }}"
+        alert_webhook_url: "{{ lookup('ansible.builtin.env', 'ALERT_WEBHOOK_URL') | default(alert_webhook_url | default(''), true) }}"
+        deepinfra_api_key: "{{ lookup('ansible.builtin.env', 'DEEPINFRA_API_KEY') | default(deepinfra_api_key | default(''), true) }}"
+        git_version: "{{ lookup('ansible.builtin.env', 'GIT_VERSION') | default(git_version, true) }}"
+
+    - name: Require the mandatory settings
+      ansible.builtin.assert:
+        that:
+          - public_host | length > 0
+          - postgres_password | length > 0
+          - jwt_secret | length >= 16
+          - grafana_admin_password | length > 0
+          - alert_webhook_url | length > 0
+        fail_msg: >-
+          Faltam variaveis obrigatorias. Defina PUBLIC_HOST, POSTGRES_PASSWORD,
+          JWT_SECRET (>=16), GRAFANA_ADMIN_PASSWORD e ALERT_WEBHOOK_URL por env
+          ou em group_vars/all.yml.
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - ufw
+          - fail2ban
+          - unattended-upgrades
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Enable unattended security upgrades
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Enable fail2ban
+      ansible.builtin.service:
+        name: fail2ban
+        state: started
+        enabled: true
+
+    - name: Create the deploy user
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Create the Docker apt keyring
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add the Docker apt repository
+      vars:
+        docker_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else ansible_architecture }}"
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/debian
+          {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+
+    - name: Install Docker Engine and the Compose plugin
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Start Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Let the deploy user run Docker
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: true
+
+    - name: Set the firewall default to deny incoming
+      ansible.builtin.command: ufw default deny incoming
+      changed_when: true
+
+    - name: Allow SSH, HTTP and HTTPS through the firewall
+      ansible.builtin.command: "ufw allow {{ item }}/tcp"
+      loop:
+        - "22"
+        - "80"
+        - "443"
+      changed_when: true
+
+    - name: Enable the firewall
+      ansible.builtin.command: ufw --force enable
+      changed_when: true
+
+    - name: Check out the application repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ git_version }}"
+        force: true
+
+    - name: Render the production .env
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ app_dir }}/.env"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Start the data services
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml up -d db redis
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Run database migrations
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml --profile tools run --rm migrate
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Build and start the full stack
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml up -d --build
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Drop unused images
+      ansible.builtin.command:
+        cmd: docker image prune -f
+      changed_when: false
+
+    - name: Wait for the API to answer through Caddy
+      ansible.builtin.uri:
+        url: "https://{{ public_host }}/health"
+        status_code: 200
+        validate_certs: true
+      register: api_health
+      until: api_health.status == 200
+      retries: 20
+      delay: 6
