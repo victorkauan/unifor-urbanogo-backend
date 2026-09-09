@@ -59,4 +59,27 @@ describe("calculateFare", () => {
     expect(() => calculateFare({ distanceMeters: Number.NaN })).toThrow();
     expect(() => calculateFare({ distanceMeters: Number.POSITIVE_INFINITY })).toThrow();
   });
+
+  it("applies the surge multipliers to the distance fare only", () => {
+    const fare = calculateFare({
+      distanceMeters: 5400,
+      multipliers: { time: 1.25, demand: 1.6, weather: 1 },
+    });
+    expect(fare.breakdown.distance_cents).toBe(Math.round(5.4 * 180 * 1.25 * 1.6));
+    expect(fare.amount_cents).toBe(500 + fare.breakdown.distance_cents + 200);
+    expect(fare.breakdown.multipliers).toEqual({ time: 1.25, demand: 1.6, weather: 1 });
+  });
+
+  it("fills missing multipliers with a neutral factor", () => {
+    const fare = calculateFare({ distanceMeters: 1000, multipliers: { demand: 2 } });
+    expect(fare.breakdown.multipliers).toEqual({ time: 1, demand: 2, weather: 1 });
+    expect(fare.breakdown.distance_cents).toBe(360);
+  });
+
+  it("rejects a non-positive multiplier", () => {
+    expect(() => calculateFare({ distanceMeters: 1000, multipliers: { time: 0 } })).toThrow();
+    expect(() =>
+      calculateFare({ distanceMeters: 1000, multipliers: { weather: Number.NaN } }),
+    ).toThrow();
+  });
 });
