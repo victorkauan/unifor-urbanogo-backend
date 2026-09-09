@@ -14,6 +14,12 @@ interface UpdateDriverBody {
   vehicle_plate?: string;
 }
 
+interface UpdateAvailabilityBody {
+  is_online: boolean;
+}
+
+const ONLINE_DRIVERS_KEY = "drivers:online";
+
 export async function getMe(req: FastifyRequest, reply: FastifyReply) {
   const userId = authUserId(req);
   if (!userId) {
@@ -78,4 +84,29 @@ export async function updateMe(req: FastifyRequest, reply: FastifyReply) {
   });
 
   return reply.ok({ driver: serializeDriver(updated) }, "Perfil de motorista atualizado");
+}
+
+export async function updateAvailability(req: FastifyRequest, reply: FastifyReply) {
+  const userId = authUserId(req);
+  if (!userId) {
+    return reply.fail(401, "Não autenticado");
+  }
+
+  const body = req.body as UpdateAvailabilityBody;
+  const driver = await req.server.prisma.driver.findFirst({ where: { userId, deletedAt: null } });
+  if (!driver) {
+    return reply.fail(404, "Perfil de motorista não encontrado");
+  }
+
+  const updated = await req.server.prisma.driver.update({
+    where: { id: driver.id },
+    data: { isOnline: body.is_online, updatedById: userId },
+  });
+
+  const sync = body.is_online
+    ? req.server.redis.sadd(ONLINE_DRIVERS_KEY, driver.id)
+    : req.server.redis.srem(ONLINE_DRIVERS_KEY, driver.id);
+  void sync.catch(() => {});
+
+  return reply.ok({ is_online: updated.isOnline }, "Disponibilidade do motorista atualizada");
 }
