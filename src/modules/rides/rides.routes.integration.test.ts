@@ -346,4 +346,98 @@ describe.runIf(shouldRun)("ride request routes", () => {
     });
     expect(completed.json().data.total).toBe(0);
   });
+
+  it("takes an assigned ride through arrive, start and complete", async () => {
+    const driver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    await assignRide(rideId, driver.userId);
+    const driverHeaders = { authorization: `Bearer ${driver.token}` };
+
+    const arrive = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/arrive`,
+      headers: driverHeaders,
+    });
+    expect(arrive.statusCode).toBe(200);
+    expect(arrive.json().data.ride.arrived_at).not.toBeNull();
+    expect(arrive.json().data.ride.status).toBe("assigned");
+
+    const start = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/start`,
+      headers: driverHeaders,
+    });
+    expect(start.statusCode).toBe(200);
+    expect(start.json().data.ride.status).toBe("in_progress");
+
+    const complete = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/complete`,
+      headers: driverHeaders,
+    });
+    expect(complete.statusCode).toBe(200);
+    expect(complete.json().data.ride.status).toBe("completed");
+
+    const stored = await app.prisma.ride.findUnique({ where: { id: rideId } });
+    expect(stored?.arrivedAt).not.toBeNull();
+    expect(stored?.startedAt).not.toBeNull();
+    expect(stored?.completedAt).not.toBeNull();
+  });
+
+  it("refuses to start a ride before the driver marks arrival", async () => {
+    const driver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    await assignRide(rideId, driver.userId);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/start`,
+      headers: { authorization: `Bearer ${driver.token}` },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it("refuses a second arrival on the same ride", async () => {
+    const driver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    await assignRide(rideId, driver.userId);
+    const headers = { authorization: `Bearer ${driver.token}` };
+
+    const first = await app.inject({ method: "POST", url: `/rides/${rideId}/arrive`, headers });
+    expect(first.statusCode).toBe(200);
+    const second = await app.inject({ method: "POST", url: `/rides/${rideId}/arrive`, headers });
+    expect(second.statusCode).toBe(409);
+  });
+
+  it("blocks a driver who isn't assigned from marking arrival", async () => {
+    const assignedDriver = await onlineDriverWithToken();
+    const outsiderDriver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    await assignRide(rideId, assignedDriver.userId);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/arrive`,
+      headers: { authorization: `Bearer ${outsiderDriver.token}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("refuses to complete a ride that hasn't started", async () => {
+    const driver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    await assignRide(rideId, driver.userId);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/complete`,
+      headers: { authorization: `Bearer ${driver.token}` },
+    });
+    expect(res.statusCode).toBe(409);
+  });
 });
