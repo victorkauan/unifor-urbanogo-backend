@@ -43,7 +43,7 @@ export const socketPlugin = fp(
     });
 
     const tracker = createPositionTracker(io, app.prisma, app.log);
-    registerRealtimeGateway(io, app.redis, tracker);
+    registerRealtimeGateway(io, app.redis, app.prisma, tracker);
 
     app.decorate("io", io);
 
