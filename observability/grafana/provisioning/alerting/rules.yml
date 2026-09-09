@@ -1,0 +1,87 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: urbanogo-sla
+    folder: UrbanoGo
+    interval: 1m
+    rules:
+      - uid: urbanogo-matching-p95
+        title: "Matching p95 acima de 3s"
+        condition: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência do matching (p95, corridas atribuídas) passou do SLA de 3s"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                histogram_quantile(0.95,
+                sum(rate(matching_search_duration_seconds_bucket{outcome="assigned"}[5m])) by (le))
+          - refId: C
+            datasourceUid: "-100"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [3] }
+
+      - uid: urbanogo-error-rate
+        title: "Taxa de erro acima do limite"
+        condition: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mais de 5% das respostas HTTP nos últimos 5 minutos são 5xx"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+                / sum(rate(http_requests_total[5m]))
+          - refId: C
+            datasourceUid: "-100"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+
+      - uid: urbanogo-api-down
+        title: "API fora do ar"
+        condition: C
+        for: 1m
+        noDataState: Alerting
+        labels:
+          severity: critical
+        annotations:
+          summary: "O Prometheus não conseguiu raspar a API na última leitura"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: up{job="urbanogo-api"}
+          - refId: C
+            datasourceUid: "-100"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
