@@ -34,16 +34,19 @@ disparam e aparecem no Grafana, só não notificam ninguém no canal do time.
 ## Produção
 
 `docker-compose.prod.yml` usa a imagem buildada, sem bind mount, com `restart` e
-segredos vindos de um `.env` no servidor. Prometheus e Grafana sobem junto
-(Prometheus raspa o serviço `api` do próprio Compose; Grafana exige
-`GRAFANA_ADMIN_PASSWORD` e não tem acesso anônimo). As portas 9090/3001 ficam
-expostas por padrão — restrinja por firewall ou reverse proxy antes de expor
-o servidor de verdade (fora do escopo desta tarefa, entra com o deploy/INF-3).
+segredos vindos de um `.env` no servidor. Um serviço `caddy` é o único ponto
+público (80/443) e faz HTTPS automático; `api`, `db`, `redis` e `grafana` só
+existem na rede interna do Compose e o `prometheus` escuta apenas em
+`127.0.0.1:9090`. As migrations rodam num serviço one-shot no profile `tools`.
 
 ```bash
-cp .env.prod.example .env   # preencher POSTGRES_PASSWORD, JWT_SECRET e GRAFANA_ADMIN_PASSWORD
+cp .env.prod.example .env   # preencher POSTGRES_PASSWORD, JWT_SECRET, GRAFANA_ADMIN_PASSWORD, ALERT_WEBHOOK_URL, PUBLIC_HOST
 docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml --profile tools run --rm migrate
 ```
+
+O provisionamento da VPS e o deploy automático (Ansible + GitHub Actions) estão
+em [deploy.md](deploy.md).
 
 ## Scripts npm
 
