@@ -178,7 +178,11 @@ describe.runIf(shouldRun)("offer accept/reject routes", () => {
       url: "/offers/not-a-uuid/accept",
       headers: { authorization: `Bearer ${token}` },
     });
-    expect(res.statusCode).toBeGreaterThanOrEqual(400);
-    expect(res.statusCode).toBeLessThan(500);
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toMatchObject({
+      status_code: 422,
+      message: "Payload inválido",
+      data: { errors: expect.any(Array) },
+    });
   });
 });
