@@ -4,6 +4,7 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 import { config } from "./lib/config.js";
 import { AppError } from "./lib/errors.js";
 import { responsePlugin } from "./lib/response.js";
+import { matchingPlugin } from "./plugins/matching.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
 import { socketPlugin } from "./plugins/socket.js";
@@ -43,6 +44,7 @@ export async function buildApp() {
   await app.register(prismaPlugin);
   await app.register(redisPlugin);
   await app.register(socketPlugin);
+  await app.register(matchingPlugin);
 
   await app.register(healthRoutes);
   await app.register(userRoutes, { prefix: "/users" });
