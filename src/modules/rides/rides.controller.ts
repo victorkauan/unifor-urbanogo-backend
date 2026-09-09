@@ -4,6 +4,7 @@ import { authUserId } from "../auth/auth-user.js";
 import { haversineKm } from "../../lib/geo.js";
 import { createSocketMatchingNotifier } from "../matching/matching.notifier.js";
 import { calculateFare } from "../pricing/pricing.service.js";
+import { recordRideRequest } from "../realtime/demand-signal.repo.js";
 import { rideResponseInclude, serializeRide, type RideForResponse } from "./ride.serializer.js";
 import { assertRideTransition, isTerminalRideStatus } from "./ride-state-machine.js";
 
@@ -114,6 +115,10 @@ export async function createRide(req: FastifyRequest, reply: FastifyReply) {
 
   void req.server.matching.start(created.id).catch((err: unknown) => {
     req.log.error({ err, rideId: created.id }, "falha ao iniciar o matching");
+  });
+
+  void recordRideRequest(req.server.redis, origin).catch((err: unknown) => {
+    req.log.error({ err, rideId: created.id }, "falha ao registrar sinal de demanda");
   });
 
   const ride = await req.server.prisma.ride.findUniqueOrThrow({
