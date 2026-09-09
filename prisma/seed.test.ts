@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { resetDatabase } from "../test/db.js";
 import { findNearbyOnlineDrivers } from "../src/modules/rides/nearby-drivers.js";
 import { seed } from "./seed.js";
 
@@ -11,6 +12,10 @@ describe.runIf(shouldRun)("database seed", () => {
 
   beforeAll(async () => {
     await prisma.$connect();
+  });
+
+  beforeEach(async () => {
+    await resetDatabase(prisma);
   });
 
   afterAll(async () => {

@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Redis } from "ioredis";
 import type { Server, Socket } from "socket.io";
+import { recordDriverPresence } from "./demand-signal.repo.js";
 import { saveDriverLocation } from "./driver-location.repo.js";
 import type { PositionTracker } from "./position-tracker.js";
 import { driverLocationEventSchema, rideRoomEventSchema } from "./realtime.schema.js";
@@ -19,6 +20,10 @@ export function rideRoom(rideId: string): string {
   return `ride:${rideId}`;
 }
 
+export function userRoom(userId: string): string {
+  return `user:${userId}`;
+}
+
 function socketData(socket: RealtimeSocket): RealtimeSocketData {
   return socket.data as RealtimeSocketData;
 }
@@ -35,6 +40,7 @@ export function registerRealtimeGateway(
 ) {
   io.on("connection", (socket: RealtimeSocket) => {
     const { log, userId } = socketData(socket);
+    void socket.join(userRoom(userId));
     log.info("socket conectado");
 
     socket.on("ride:join", (payload: unknown, ack?: (result: { ok: boolean }) => void) => {
@@ -69,7 +75,10 @@ export function registerRealtimeGateway(
         emitInvalidPayload(socket, "driver:location", "payload de posição inválido");
         return;
       }
-      saveDriverLocation(redis, userId, parsed.data)
+      Promise.all([
+        saveDriverLocation(redis, userId, parsed.data),
+        recordDriverPresence(redis, userId, parsed.data),
+      ])
         .then(() => {
           log.debug({ lat: parsed.data.lat, lng: parsed.data.lng }, "posição do motorista gravada");
           return tracker.handleDriverLocation({ userId, location: parsed.data });

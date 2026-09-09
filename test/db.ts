@@ -16,5 +16,19 @@ export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   }
 
   const tableNames = tables.map((t) => `"${t.tablename}"`).join(", ");
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE`);
+  const truncate = `TRUNCATE TABLE ${tableNames} RESTART IDENTITY CASCADE`;
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await prisma.$executeRawUnsafe(truncate);
+      return;
+    } catch (err) {
+      const code = (err as { meta?: { code?: string } }).meta?.code;
+      if (code === "40P01" && attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
 }

@@ -253,7 +253,7 @@ na sala para receber posição e status.
 |---|---|---|
 | `matching:offer` | `{ offer_id, ride_id, expires_at, pickup, dropoff, passenger: { name, trust_score }, distance_to_pickup_meters, price_cents }` | motorista candidato |
 | `matching:cancelled` | `{ ride_id, reason }` | passageiro, quando a busca esgota ou estoura o timeout global |
-| `ride:status` | `{ ride_id, status, driver?, updated_at }` | sala da corrida, a cada transição de estado |
+| `ride:status` | `{ ride_id, status, driver?, arrived_at?, updated_at }` | sala da corrida, a cada transição de estado e também em `arrive` (que não muda `status`, só preenche `arrived_at`) |
 | `ride:driver_location` | `{ ride_id, lat, lng, heading?, speed?, recorded_at, predicted }` | passageiro; posição consolidada do motorista pelo servidor (RT-4 / URB-42). `predicted` é `true` quando o ponto é extrapolado por dead reckoning entre leituras reais, `false` quando vem direto de um `driver:location` |
 | `error` | `{ code, message }` | quem causou o erro |
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
-type DependencyStatus = "ok" | "erro";
+type DependencyStatus = "ok" | "error";
 
 async function checkPostgres(app: FastifyInstance): Promise<DependencyStatus> {
   try {
@@ -8,7 +8,7 @@ async function checkPostgres(app: FastifyInstance): Promise<DependencyStatus> {
     return "ok";
   } catch (err) {
     app.log.error({ err }, "readiness: postgres indisponível");
-    return "erro";
+    return "error";
   }
 }
 
@@ -18,7 +18,7 @@ async function checkRedis(app: FastifyInstance): Promise<DependencyStatus> {
     return "ok";
   } catch (err) {
     app.log.error({ err }, "readiness: redis indisponível");
-    return "erro";
+    return "error";
   }
 }
 
