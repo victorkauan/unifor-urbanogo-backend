@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { signToken } from "../../lib/jwt.js";
 import { serializeUser } from "../users/user.serializer.js";
 import { authUserId } from "./auth-user.js";
