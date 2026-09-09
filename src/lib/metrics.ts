@@ -47,3 +47,22 @@ export const rideDuration = new Histogram({
   buckets: [60, 180, 300, 600, 900, 1800, 3600],
   registers: [registry],
 });
+
+/**
+ * Sinal de demanda por região (RT-5). Snapshot periódico do Redis, não um
+ * contador incremental: cada atualização reseta e reescreve só as células
+ * atualmente ativas, pra células que esfriaram não ficarem penduradas.
+ */
+export const demandDriversOnline = new Gauge({
+  name: "demand_drivers_online",
+  help: "Motoristas online recentes por região (grade)",
+  labelNames: ["cell"] as const,
+  registers: [registry],
+});
+
+export const demandRequestsRecent = new Gauge({
+  name: "demand_requests_recent",
+  help: "Pedidos recentes por região (grade)",
+  labelNames: ["cell"] as const,
+  registers: [registry],
+});
