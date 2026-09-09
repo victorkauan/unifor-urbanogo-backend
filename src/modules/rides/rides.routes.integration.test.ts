@@ -31,8 +31,9 @@ describe.runIf(shouldRun)("ride request routes", () => {
   });
 
   afterEach(async () => {
-    await resetDatabase(app.prisma);
+    app.matching.stopAll();
     await app.redis.flushall();
+    await resetDatabase(app.prisma);
   });
 
   afterAll(async () => {
@@ -153,8 +154,8 @@ describe.runIf(shouldRun)("ride request routes", () => {
     const { token } = await passengerToken();
     const headers = { authorization: `Bearer ${token}` };
 
-    const first = await app.inject({ method: "POST", url: "/rides", headers, payload: VALID_BODY });
-    expect(first.statusCode).toBe(201);
+    const rideId = await createRide(token);
+    expect(rideId).toBeTruthy();
 
     const second = await app.inject({
       method: "POST",
@@ -166,14 +167,9 @@ describe.runIf(shouldRun)("ride request routes", () => {
   });
 
   it("lets the passenger read their ride and blocks outsiders", async () => {
+    await onlineDriverNearby();
     const { token } = await passengerToken();
-    const created = await app.inject({
-      method: "POST",
-      url: "/rides",
-      headers: { authorization: `Bearer ${token}` },
-      payload: VALID_BODY,
-    });
-    const rideId = created.json().data.ride.id as string;
+    const rideId = await createRide(token);
 
     const own = await app.inject({
       method: "GET",
@@ -202,6 +198,16 @@ describe.runIf(shouldRun)("ride request routes", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  async function settleMatching(rideId: string) {
+    await waitFor(async () => {
+      const [offers, ride] = await Promise.all([
+        app.prisma.rideOffer.count({ where: { rideId } }),
+        app.prisma.ride.findUnique({ where: { id: rideId }, select: { status: true } }),
+      ]);
+      return offers > 0 || ride?.status !== "searching";
+    });
+  }
+
   async function createRide(token: string) {
     const created = await app.inject({
       method: "POST",
@@ -209,7 +215,9 @@ describe.runIf(shouldRun)("ride request routes", () => {
       headers: { authorization: `Bearer ${token}` },
       payload: VALID_BODY,
     });
-    return created.json().data.ride.id as string;
+    const rideId = created.json().data.ride.id as string;
+    await settleMatching(rideId);
+    return rideId;
   }
 
   async function assignRide(rideId: string, driverUserId: string) {

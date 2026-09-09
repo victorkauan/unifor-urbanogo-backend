@@ -347,6 +347,12 @@ export class MatchingEngine {
     this.logger.info({ rideId, reason }, "matching search ended without a match");
   }
 
+  stopAll(): void {
+    for (const rideId of [...this.timers.keys()]) {
+      this.stopTimers(rideId);
+    }
+  }
+
   private stopTimers(rideId: string): void {
     const timers = this.timers.get(rideId);
     timers?.offer?.cancel();

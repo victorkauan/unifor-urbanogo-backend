@@ -14,8 +14,9 @@ describe.runIf(shouldRun)("offer accept/reject routes", () => {
   });
 
   afterEach(async () => {
-    await resetDatabase(app.prisma);
+    app.matching.stopAll();
     await app.redis.flushall();
+    await resetDatabase(app.prisma);
   });
 
   afterAll(async () => {

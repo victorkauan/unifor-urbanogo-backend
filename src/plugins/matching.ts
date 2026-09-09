@@ -20,6 +20,10 @@ export const matchingPlugin = fp(
     });
 
     app.decorate("matching", engine);
+
+    app.addHook("onClose", async () => {
+      engine.stopAll();
+    });
   },
   { name: "matching", dependencies: ["prisma", "redis", "socket"] },
 );
