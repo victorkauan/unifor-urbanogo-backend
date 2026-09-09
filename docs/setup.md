@@ -17,13 +17,31 @@ npm run dev
 `npm run dev:up` sobe a infraestrutura, espera ficar saudável, aplica as
 migrations e roda o seed. API em `http://localhost:3000`, rota `GET /health`.
 
+O Compose também sobe Prometheus (`http://localhost:9090`) e Grafana
+(`http://localhost:3001`, login `admin`/`admin` em dev, acesso anônimo de
+leitura liberado). O Prometheus raspa `/metrics` da API no host via
+`host.docker.internal:3000`; o datasource, o dashboard e os alertas já vêm
+provisionados como código em `observability/`, nada pra configurar na mão.
+
+### Alertas
+
+Três alertas provisionados (`observability/grafana/provisioning/alerting/`):
+matching p95 acima de 3s, taxa de erro acima de 5% e API fora do ar (inclusive
+quando o Prometheus não consegue nem raspar). Notificam um webhook (Slack,
+Discord, etc.) via `ALERT_WEBHOOK_URL` — sem essa variável, os alertas ainda
+disparam e aparecem no Grafana, só não notificam ninguém no canal do time.
+
 ## Produção
 
 `docker-compose.prod.yml` usa a imagem buildada, sem bind mount, com `restart` e
-segredos vindos de um `.env` no servidor.
+segredos vindos de um `.env` no servidor. Prometheus e Grafana sobem junto
+(Prometheus raspa o serviço `api` do próprio Compose; Grafana exige
+`GRAFANA_ADMIN_PASSWORD` e não tem acesso anônimo). As portas 9090/3001 ficam
+expostas por padrão — restrinja por firewall ou reverse proxy antes de expor
+o servidor de verdade (fora do escopo desta tarefa, entra com o deploy/INF-3).
 
 ```bash
-cp .env.prod.example .env   # preencher POSTGRES_PASSWORD e JWT_SECRET
+cp .env.prod.example .env   # preencher POSTGRES_PASSWORD, JWT_SECRET e GRAFANA_ADMIN_PASSWORD
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
@@ -56,6 +74,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 | `REDIS_URL` | sim | | string de conexão do Redis |
 | `JWT_SECRET` | sim | | segredo para assinar os JWT (mínimo 16 caracteres) |
 | `RUN_DB_TESTS` | não | | `"1"` sinaliza que `DATABASE_URL`/`REDIS_URL` apontam para um banco alcançável; liga os testes de integração (`describe.runIf`) |
+| `ALERT_WEBHOOK_URL` | não (obrigatória em prod) | | webhook pro Grafana notificar o canal do time quando um alerta dispara |
 
 ## Testes de integração (RUN_DB_TESTS)
 

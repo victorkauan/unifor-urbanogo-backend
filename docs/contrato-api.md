@@ -244,6 +244,8 @@ Métricas próprias, além das padrão de processo (CPU, memória, event loop) d
 | `matching_queue_size` | Gauge | — | corridas em busca de motorista agora |
 | `position_update_latency_seconds` | Histogram | — | latência ponta a ponta da posição do motorista (RT-4) |
 | `ride_duration_seconds` | Histogram | — | duração da corrida, de `in_progress` até `completed` |
+| `demand_drivers_online` | Gauge | `cell` | motoristas online recentes por região (RT-5), recalculado a cada 15s |
+| `demand_requests_recent` | Gauge | `cell` | pedidos recentes por região (RT-5), recalculado a cada 15s |
 
 ## WebSocket (Socket.IO)
 

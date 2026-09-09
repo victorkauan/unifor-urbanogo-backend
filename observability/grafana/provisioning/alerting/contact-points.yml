@@ -1,0 +1,10 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: canal-do-time
+    receivers:
+      - uid: canal-do-time-webhook
+        type: webhook
+        settings:
+          url: "${ALERT_WEBHOOK_URL}"
