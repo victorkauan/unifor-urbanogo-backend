@@ -1,55 +1,93 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp, type AppInstance } from "../../app.js";
-import { PrismaClient } from "@prisma/client";
-const prisma = new PrismaClient();
+import { resetDatabase } from "../../../test/db.js";
 
-describe("Auth Routes", () => {
+const shouldRun = process.env.RUN_DB_TESTS === "1";
+
+describe.runIf(shouldRun)("auth routes", () => {
   let app: AppInstance;
-  const testEmail = "test@example.com";
 
   beforeAll(async () => {
     app = await buildApp();
     await app.ready();
-    await prisma.user.deleteMany({ where: { email: testEmail } });
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { email: testEmail } });
+    await resetDatabase(app.prisma);
     await app.close();
   });
 
-  it("should register a new user", async () => {
-    const response = await app.inject({
-      method: "POST",
-      url: "/auth/register",
-      payload: {
-        name: "Test User",
-        email: testEmail,
-        password: "password123",
-        role: "passenger",
+  function credentials() {
+    return {
+      name: "John Doe",
+      email: `john-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`,
+      password: "password123",
+      phone: "+5585999990000",
+      role: "passenger" as const,
+    };
+  }
+
+  it("registers a user and returns the user and a token in the envelope", async () => {
+    const body = credentials();
+    const res = await app.inject({ method: "POST", url: "/auth/register", payload: body });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      status_code: 201,
+      data: {
+        user: { name: "John Doe", email: body.email, phone: body.phone, role: "passenger" },
+        token: expect.any(String),
       },
     });
-
-    expect(response.statusCode).toBe(201);
-
-    const body = JSON.parse(response.payload);
-    expect(body).toHaveProperty("id");
-    expect(body.email).toBe(testEmail);
   });
 
-  it("should login the user and return a token", async () => {
-    const response = await app.inject({
+  it("rejects a duplicate email", async () => {
+    const body = credentials();
+    await app.inject({ method: "POST", url: "/auth/register", payload: body });
+    const again = await app.inject({ method: "POST", url: "/auth/register", payload: body });
+    expect(again.statusCode).toBe(409);
+  });
+
+  it("logs in and returns the user and a token", async () => {
+    const body = credentials();
+    await app.inject({ method: "POST", url: "/auth/register", payload: body });
+
+    const res = await app.inject({
       method: "POST",
       url: "/auth/login",
-      payload: {
-        email: testEmail,
-        password: "password123",
-      },
+      payload: { email: body.email, password: body.password },
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.user.email).toBe(body.email);
+    expect(res.json().data.token).toEqual(expect.any(String));
+  });
 
-    const body = JSON.parse(response.payload);
-    expect(body).toHaveProperty("token");
+  it("rejects a login with a wrong password", async () => {
+    const body = credentials();
+    await app.inject({ method: "POST", url: "/auth/register", payload: body });
+    const res = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: body.email, password: "wrong-password" },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("returns the current user on GET /auth/me and 401 without a token", async () => {
+    const body = credentials();
+    const register = await app.inject({ method: "POST", url: "/auth/register", payload: body });
+    const token = register.json().data.token as string;
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/auth/me",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(me.statusCode).toBe(200);
+    expect(me.json().data.user.email).toBe(body.email);
+
+    const anon = await app.inject({ method: "GET", url: "/auth/me" });
+    expect(anon.statusCode).toBe(401);
   });
 });

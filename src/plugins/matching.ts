@@ -15,7 +15,7 @@ export const matchingPlugin = fp(
       prisma: app.prisma,
       redis: app.redis,
       notifier: createSocketMatchingNotifier(app.io),
-      trust: { getTrust: (userId) => getTrustScore(userId) },
+      trust: { getTrust: (userId) => getTrustScore(app.prisma, userId) },
       logger: app.log,
     });
 

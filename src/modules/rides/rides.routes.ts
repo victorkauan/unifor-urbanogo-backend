@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 import { verifyJwt } from "../auth/auth.middleware.js";
+import { createRating } from "../ratings/ratings.controller.js";
 import { cancelRide, createRide, getRide, listRides } from "./rides.controller.js";
 
 const geoPointSchema = z.object({
@@ -34,6 +35,11 @@ const listRidesQuerySchema = z.object({
 
 const rideParamsSchema = z.object({ rideId: z.string().uuid() });
 
+const createRatingSchema = z.object({
+  score: z.number().int().min(1).max(5),
+  comment: z.string().min(1).max(1000).optional(),
+});
+
 export const rideRoutes: FastifyPluginAsyncZod = async (app) => {
   app.post("/", { preHandler: verifyJwt, schema: { body: createRideSchema } }, createRide);
 
@@ -45,5 +51,11 @@ export const rideRoutes: FastifyPluginAsyncZod = async (app) => {
     "/:rideId/cancel",
     { preHandler: verifyJwt, schema: { params: rideParamsSchema } },
     cancelRide,
+  );
+
+  app.post(
+    "/:rideId/ratings",
+    { preHandler: verifyJwt, schema: { params: rideParamsSchema, body: createRatingSchema } },
+    createRating,
   );
 };

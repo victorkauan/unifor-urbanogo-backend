@@ -28,14 +28,15 @@ describe.runIf(shouldRun)(
         url: "/auth/register",
         payload: { name: "Token User", email, password: "password123", role: "driver" },
       });
-      const userId = register.json().id as string;
+      const userId = register.json().data.user.id as string;
+      expect(register.statusCode).toBe(201);
 
       const login = await app.inject({
         method: "POST",
         url: "/auth/login",
         payload: { email, password: "password123" },
       });
-      const token = login.json().token as string;
+      const token = login.json().data.token as string;
 
       expect(verifyToken(token)).toEqual({ sub: userId });
 
