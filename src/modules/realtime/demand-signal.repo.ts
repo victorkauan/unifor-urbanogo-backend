@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Redis } from "ioredis";
+import { demandDriversOnline, demandRequestsRecent } from "../../lib/metrics.js";
 
 /**
  * Grade simples (2 casas decimais ≈ 1.1km por célula em Fortaleza), em vez de
@@ -107,4 +108,45 @@ export async function getDemandRatio(
     return undefined;
   }
   return drivers === 0 ? DEMAND_RATIO_NO_DRIVERS : requests / drivers;
+}
+
+async function scanCells(redis: Redis, prefix: string): Promise<Set<string>> {
+  const cells = new Set<string>();
+  let cursor = "0";
+  do {
+    const [next, keys] = await redis.scan(cursor, "MATCH", `${prefix}*`, "COUNT", 100);
+    cursor = next;
+    for (const key of keys) {
+      cells.add(key.slice(prefix.length));
+    }
+  } while (cursor !== "0");
+  return cells;
+}
+
+/**
+ * Recalcula os gauges de demanda por região (OBS-4) a partir do Redis.
+ * Reseta antes de reescrever: uma célula que esfriou (sem motorista nem
+ * pedido recente) simplesmente não aparece mais, em vez de ficar com um
+ * valor antigo pendurado no painel.
+ */
+export async function snapshotDemandMetrics(redis: Redis, now: number = Date.now()): Promise<void> {
+  const [driverCells, requestCells] = await Promise.all([
+    scanCells(redis, "demand:drivers:"),
+    scanCells(redis, "demand:requests:"),
+  ]);
+  const cells = new Set([...driverCells, ...requestCells]);
+
+  demandDriversOnline.reset();
+  demandRequestsRecent.reset();
+
+  await Promise.all(
+    [...cells].map(async (cell) => {
+      const [drivers, requests] = await Promise.all([
+        countRecent(redis, driversKey(cell), DRIVER_PRESENCE_WINDOW_MS, now),
+        countRecent(redis, requestsKey(cell), REQUEST_DEMAND_WINDOW_MS, now),
+      ]);
+      demandDriversOnline.set({ cell }, drivers);
+      demandRequestsRecent.set({ cell }, requests);
+    }),
+  );
 }
