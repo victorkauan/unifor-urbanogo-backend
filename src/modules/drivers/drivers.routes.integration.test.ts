@@ -76,6 +76,53 @@ describe.runIf(shouldRun)("driver profile routes", () => {
     expect(patched.json().data.driver.service_preference).toBe("both");
   });
 
+  it("toggles the driver availability", async () => {
+    const { token } = await driverToken();
+    const headers = { authorization: `Bearer ${token}` };
+
+    await app.inject({
+      method: "POST",
+      url: "/drivers/me",
+      headers,
+      payload: { service_preference: "rides" },
+    });
+
+    const online = await app.inject({
+      method: "PUT",
+      url: "/drivers/me/availability",
+      headers,
+      payload: { is_online: true },
+    });
+    expect(online.statusCode).toBe(200);
+    expect(online.json().data).toMatchObject({ is_online: true });
+
+    const read = await app.inject({ method: "GET", url: "/drivers/me", headers });
+    expect(read.json().data.driver.is_online).toBe(true);
+
+    const onlineMembers = await app.redis.smembers("drivers:online");
+    expect(onlineMembers).toContain(read.json().data.driver.id);
+
+    const offline = await app.inject({
+      method: "PUT",
+      url: "/drivers/me/availability",
+      headers,
+      payload: { is_online: false },
+    });
+    expect(offline.statusCode).toBe(200);
+    expect(offline.json().data).toMatchObject({ is_online: false });
+  });
+
+  it("rejects availability changes without a profile", async () => {
+    const { token } = await driverToken();
+    const res = await app.inject({
+      method: "PUT",
+      url: "/drivers/me/availability",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { is_online: true },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
   it("requires a token", async () => {
     const res = await app.inject({ method: "GET", url: "/drivers/me" });
     expect(res.statusCode).toBe(401);
