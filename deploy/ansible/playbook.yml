@@ -20,6 +20,7 @@
         alert_webhook_url: "{{ lookup('ansible.builtin.env', 'ALERT_WEBHOOK_URL') | default(alert_webhook_url | default(''), true) }}"
         deepinfra_api_key: "{{ lookup('ansible.builtin.env', 'DEEPINFRA_API_KEY') | default(deepinfra_api_key | default(''), true) }}"
         git_version: "{{ lookup('ansible.builtin.env', 'GIT_VERSION') | default(git_version, true) }}"
+        github_token: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') | default(github_token | default(''), true) }}"
 
     - name: Require the mandatory settings
       ansible.builtin.assert:
@@ -127,11 +128,20 @@
       changed_when: true
 
     - name: Check out the application repository
+      vars:
+        checkout_url: "{{ 'https://x-access-token:' ~ github_token ~ '@github.com/victorkauan/unifor-urbanogo-backend.git' if github_token | length > 0 else repo_url }}"
       ansible.builtin.git:
-        repo: "{{ repo_url }}"
+        repo: "{{ checkout_url }}"
         dest: "{{ app_dir }}"
         version: "{{ git_version }}"
         force: true
+      no_log: true
+
+    - name: Scrub credentials from the git remote
+      ansible.builtin.command:
+        cmd: "git -C {{ app_dir }} remote set-url origin {{ repo_url }}"
+      changed_when: false
+      when: github_token | length > 0
 
     - name: Render the production .env
       ansible.builtin.template:

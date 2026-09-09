@@ -9,6 +9,9 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: provision and deploy
@@ -45,6 +48,7 @@ jobs:
         env:
           ANSIBLE_HOST_KEY_CHECKING: "False"
           GIT_VERSION: ${{ github.ref_name }}
+          GITHUB_TOKEN: ${{ github.token }}
           PUBLIC_HOST: ${{ secrets.PUBLIC_HOST }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}

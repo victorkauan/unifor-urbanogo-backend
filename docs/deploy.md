@@ -54,6 +54,11 @@ Environment `production` (Settings → Environments → production):
 A chave pública correspondente a `VPS_SSH_KEY` precisa estar em
 `~/.ssh/authorized_keys` do `VPS_USER` na VPS.
 
+O repositório é privado; o clone na VPS usa o `GITHUB_TOKEN` automático do run
+(escopo `contents: read`), passado ao playbook só durante o deploy e removido do
+`git remote` logo em seguida. No deploy manual, use uma URL com credencial sua
+ou deixe a VPS com acesso de leitura ao repo.
+
 ## Deploy manual
 
 Da sua máquina, com Ansible instalado e acesso SSH à VPS:
