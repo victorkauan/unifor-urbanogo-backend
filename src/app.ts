@@ -8,6 +8,7 @@ import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
 import { socketPlugin } from "./plugins/socket.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
+import { driverRoutes } from "./modules/drivers/drivers.routes.js";
 import { ratingRoutes } from "./modules/ratings/ratings.routes.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 
@@ -46,6 +47,8 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: "/auth" });
 
   await app.register(ratingRoutes, { prefix: "/ratings" });
+
+  await app.register(driverRoutes, { prefix: "/drivers" });
 
   app.setNotFoundHandler((req, reply) => {
     reply.fail(404, `Rota não encontrada: ${req.method} ${req.url}`);
