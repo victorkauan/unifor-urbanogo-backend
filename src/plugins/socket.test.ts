@@ -37,6 +37,20 @@ function joinRide(socket: ClientSocket, rideId: string): Promise<{ ok: boolean }
   return new Promise((resolve) => socket.emit("ride:join", { ride_id: rideId }, resolve));
 }
 
+function mockDemandSignalWrites() {
+  return [
+    vi.spyOn(app.redis, "zadd").mockResolvedValue(1),
+    vi.spyOn(app.redis, "zremrangebyscore").mockResolvedValue(0),
+    vi.spyOn(app.redis, "expire").mockResolvedValue(1),
+  ];
+}
+
+function restoreAll(spies: { mockRestore(): void }[]) {
+  for (const spy of spies) {
+    spy.mockRestore();
+  }
+}
+
 describe("socket handshake", () => {
   it("rejects a connection without a token", async () => {
     const client = connect();
@@ -100,6 +114,7 @@ describe("driver:location ingestion", () => {
   it("stores the driver's last known position in Redis with a TTL", async () => {
     const userId = randomUUID();
     const setSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const demandSpies = mockDemandSignalWrites();
     const findFirstSpy = vi.spyOn(app.prisma.ride, "findFirst").mockResolvedValue(null);
     const client = connect(signToken({ sub: userId }));
     await waitFor(client, "connect");
@@ -122,6 +137,7 @@ describe("driver:location ingestion", () => {
     );
 
     setSpy.mockRestore();
+    restoreAll(demandSpies);
     findFirstSpy.mockRestore();
     client.close();
   });
@@ -146,6 +162,7 @@ describe("server-side position broadcast (RT-4)", () => {
     const driverUserId = randomUUID();
 
     const redisSetSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const demandSpies = mockDemandSignalWrites();
     const findFirstSpy = vi
       .spyOn(app.prisma.ride, "findFirst")
       .mockResolvedValue({ id: rideId } as never);
@@ -172,6 +189,7 @@ describe("server-side position broadcast (RT-4)", () => {
     expect(msg.predicted).toBe(false);
 
     redisSetSpy.mockRestore();
+    restoreAll(demandSpies);
     findFirstSpy.mockRestore();
     passenger.close();
     driver.close();
@@ -181,6 +199,7 @@ describe("server-side position broadcast (RT-4)", () => {
     const driverUserId = randomUUID();
 
     const redisSetSpy = vi.spyOn(app.redis, "set").mockResolvedValue("OK");
+    const demandSpies = mockDemandSignalWrites();
     const findFirstSpy = vi.spyOn(app.prisma.ride, "findFirst").mockResolvedValue(null);
 
     const driver = connect(signToken({ sub: driverUserId }));
@@ -202,6 +221,7 @@ describe("server-side position broadcast (RT-4)", () => {
     expect(received).toBe(false);
 
     redisSetSpy.mockRestore();
+    restoreAll(demandSpies);
     findFirstSpy.mockRestore();
     driver.close();
   });
