@@ -17,13 +17,23 @@ npm run dev
 `npm run dev:up` sobe a infraestrutura, espera ficar saudável, aplica as
 migrations e roda o seed. API em `http://localhost:3000`, rota `GET /health`.
 
+O Compose também sobe Prometheus (`http://localhost:9090`) e Grafana
+(`http://localhost:3001`, login `admin`/`admin` em dev, acesso anônimo de
+leitura liberado). O Prometheus raspa `/metrics` da API no host via
+`host.docker.internal:3000`; o datasource e o dashboard inicial já vêm
+provisionados como código em `observability/`, nada pra configurar na mão.
+
 ## Produção
 
 `docker-compose.prod.yml` usa a imagem buildada, sem bind mount, com `restart` e
-segredos vindos de um `.env` no servidor.
+segredos vindos de um `.env` no servidor. Prometheus e Grafana sobem junto
+(Prometheus raspa o serviço `api` do próprio Compose; Grafana exige
+`GRAFANA_ADMIN_PASSWORD` e não tem acesso anônimo). As portas 9090/3001 ficam
+expostas por padrão — restrinja por firewall ou reverse proxy antes de expor
+o servidor de verdade (fora do escopo desta tarefa, entra com o deploy/INF-3).
 
 ```bash
-cp .env.prod.example .env   # preencher POSTGRES_PASSWORD e JWT_SECRET
+cp .env.prod.example .env   # preencher POSTGRES_PASSWORD, JWT_SECRET e GRAFANA_ADMIN_PASSWORD
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 

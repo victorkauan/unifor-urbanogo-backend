@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: urbanogo-api
+    static_configs:
+      # API roda na máquina host em dev (npm run dev), não no Compose.
+      - targets: ["host.docker.internal:3000"]
