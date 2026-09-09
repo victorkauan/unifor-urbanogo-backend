@@ -2,6 +2,7 @@ import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./pricing.config.js"
 
 export interface FareInput {
   distanceMeters: number;
+  multipliers?: Partial<FareMultipliers>;
 }
 
 export interface FareMultipliers {
@@ -37,8 +38,21 @@ export function calculateFare(
     throw new Error("distanceMeters must be a non-negative finite number");
   }
 
+  const multipliers: FareMultipliers = {
+    time: input.multipliers?.time ?? NEUTRAL_MULTIPLIERS.time,
+    demand: input.multipliers?.demand ?? NEUTRAL_MULTIPLIERS.demand,
+    weather: input.multipliers?.weather ?? NEUTRAL_MULTIPLIERS.weather,
+  };
+
+  for (const [name, value] of Object.entries(multipliers)) {
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error(`multiplier "${name}" must be a positive finite number`);
+    }
+  }
+
+  const combinedMultiplier = multipliers.time * multipliers.demand * multipliers.weather;
   const distanceKm = distanceMeters / 1000;
-  const distanceCents = Math.round(distanceKm * config.perKmCents);
+  const distanceCents = Math.round(distanceKm * config.perKmCents * combinedMultiplier);
   const amountCents = config.baseFareCents + distanceCents + config.serviceFeeCents;
 
   return {
@@ -50,7 +64,7 @@ export function calculateFare(
       distance_km: distanceKm,
       distance_cents: distanceCents,
       service_fee_cents: config.serviceFeeCents,
-      multipliers: { ...NEUTRAL_MULTIPLIERS },
+      multipliers,
     },
   };
 }
