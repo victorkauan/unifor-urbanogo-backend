@@ -1,7 +1,8 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApp, type AppInstance } from "../../app.js";
 import { resetDatabase } from "../../../test/db.js";
 import { createTestUser } from "../../../test/fixtures.js";
+import { rideDuration } from "../../lib/metrics.js";
 
 const shouldRun = process.env.RUN_DB_TESTS === "1";
 
@@ -371,6 +372,7 @@ describe.runIf(shouldRun)("ride request routes", () => {
     expect(start.statusCode).toBe(200);
     expect(start.json().data.ride.status).toBe("in_progress");
 
+    const durationSpy = vi.spyOn(rideDuration, "observe");
     const complete = await app.inject({
       method: "POST",
       url: `/rides/${rideId}/complete`,
@@ -378,6 +380,8 @@ describe.runIf(shouldRun)("ride request routes", () => {
     });
     expect(complete.statusCode).toBe(200);
     expect(complete.json().data.ride.status).toBe("completed");
+    expect(durationSpy).toHaveBeenCalledWith(expect.any(Number));
+    durationSpy.mockRestore();
 
     const stored = await app.prisma.ride.findUnique({ where: { id: rideId } });
     expect(stored?.arrivedAt).not.toBeNull();

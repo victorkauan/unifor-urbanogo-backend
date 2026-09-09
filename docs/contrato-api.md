@@ -228,6 +228,25 @@ Só é permitido avaliar corrida `completed`, uma avaliação por parte. `score`
 `/ready` é o que o reverse proxy e os alertas (OBS-5) devem checar antes de
 considerar a instância apta a receber tráfego.
 
+### Métricas
+
+| Método | Rota | Resposta |
+|---|---|---|
+| GET | `/metrics` | texto no formato de exposição do Prometheus (`Content-Type: text/plain`), **não** usa o envelope `{ status_code, message, data }` |
+
+Métricas próprias, além das padrão de processo (CPU, memória, event loop) do
+`prom-client`:
+
+| Métrica | Tipo | Labels | O que mede |
+|---|---|---|---|
+| `http_requests_total` | Counter | `method`, `route`, `status_code` | requisições/s e taxa de erro (via `rate()` no PromQL, filtrando `status_code` >= 500) |
+| `matching_search_duration_seconds` | Histogram | `outcome` (`assigned`, `no_drivers_available`, `drivers_exhausted`, `timeout`, `cancelled`) | latência do matching (RIDE-3), do início da busca até o desfecho |
+| `matching_queue_size` | Gauge | — | corridas em busca de motorista agora |
+| `position_update_latency_seconds` | Histogram | — | latência ponta a ponta da posição do motorista (RT-4) |
+| `ride_duration_seconds` | Histogram | — | duração da corrida, de `in_progress` até `completed` |
+| `demand_drivers_online` | Gauge | `cell` | motoristas online recentes por região (RT-5), recalculado a cada 15s |
+| `demand_requests_recent` | Gauge | `cell` | pedidos recentes por região (RT-5), recalculado a cada 15s |
+
 ## WebSocket (Socket.IO)
 
 Conexão em `ws://localhost:3000`. O token vai no handshake:

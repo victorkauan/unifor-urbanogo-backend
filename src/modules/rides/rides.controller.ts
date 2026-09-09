@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Prisma, RideStatus } from "@prisma/client";
 import { authUserId } from "../auth/auth-user.js";
 import { haversineKm } from "../../lib/geo.js";
+import { rideDuration } from "../../lib/metrics.js";
 import { createSocketMatchingNotifier } from "../matching/matching.notifier.js";
 import { calculateFare } from "../pricing/pricing.service.js";
 import { recordRideRequest } from "../realtime/demand-signal.repo.js";
@@ -328,10 +329,15 @@ export async function completeRide(req: FastifyRequest, reply: FastifyReply) {
 
   assertRideTransition(ride.status, "completed");
 
+  const completedAt = new Date();
   await req.server.prisma.ride.update({
     where: { id: ride.id },
-    data: { status: "completed", completedAt: new Date(), updatedById: found.userId },
+    data: { status: "completed", completedAt, updatedById: found.userId },
   });
+
+  if (ride.startedAt) {
+    rideDuration.observe((completedAt.getTime() - ride.startedAt.getTime()) / 1000);
+  }
 
   const full = await req.server.prisma.ride.findUniqueOrThrow({
     where: { id: ride.id },

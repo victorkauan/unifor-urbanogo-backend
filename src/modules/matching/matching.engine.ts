@@ -2,6 +2,7 @@ import type { PrismaClient, Ride } from "@prisma/client";
 import type { Redis } from "ioredis";
 import { ConflictError, ForbiddenError, NotFoundError } from "../../lib/errors.js";
 import { haversineKm } from "../../lib/geo.js";
+import { matchingQueueSize, matchingSearchDuration } from "../../lib/metrics.js";
 import { calculateFare } from "../pricing/pricing.service.js";
 import { findNearbyOnlineDrivers } from "../rides/nearby-drivers.js";
 import { assertRideTransition } from "../rides/ride-state-machine.js";
@@ -132,6 +133,7 @@ export class MatchingEngine {
       this.fail(rideId, "timeout"),
     );
     this.timers.set(rideId, { global });
+    this.updateQueueGauge();
 
     await this.offerNext(rideId);
     this.logger.info(
@@ -186,6 +188,7 @@ export class MatchingEngine {
 
     this.stopTimers(offer.rideId);
     const state = await getSearchState(this.redis, offer.rideId);
+    this.observeSearchDuration(state?.startedAt, "assigned");
     if (state) {
       await saveSearchState(
         this.redis,
@@ -283,6 +286,7 @@ export class MatchingEngine {
       global: previous?.global ?? { cancel() {} },
       offer: offerTimer,
     });
+    this.updateQueueGauge();
   }
 
   private async onOfferTimeout(rideId: string, offerId: string): Promise<void> {
@@ -309,6 +313,7 @@ export class MatchingEngine {
       return;
     }
 
+    this.observeSearchDuration(state?.startedAt, reason);
     this.stopTimers(rideId);
     await this.prisma.rideOffer.updateMany({
       where: { rideId, status: "pending" },
@@ -358,6 +363,18 @@ export class MatchingEngine {
     timers?.offer?.cancel();
     timers?.global.cancel();
     this.timers.delete(rideId);
+    this.updateQueueGauge();
+  }
+
+  private updateQueueGauge(): void {
+    matchingQueueSize.set(this.timers.size);
+  }
+
+  private observeSearchDuration(startedAt: string | undefined, outcome: string): void {
+    if (!startedAt) {
+      return;
+    }
+    matchingSearchDuration.observe({ outcome }, (this.now() - Date.parse(startedAt)) / 1000);
   }
 
   private estimatePrice(ride: {

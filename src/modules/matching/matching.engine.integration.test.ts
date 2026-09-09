@@ -1,9 +1,10 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 import { Redis } from "ioredis";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetDatabase } from "../../../test/db.js";
 import { createTestUser } from "../../../test/fixtures.js";
 import { AppError } from "../../lib/errors.js";
+import { matchingQueueSize, matchingSearchDuration } from "../../lib/metrics.js";
 import {
   MatchingEngine,
   type MatchingEngineDeps,
@@ -142,22 +143,30 @@ describe.runIf(shouldRun)("MatchingEngine", () => {
     const ride = await searchingRide(passenger.id);
 
     const { engine, offers, statuses } = buildEngine();
+    const queueGaugeSpy = vi.spyOn(matchingQueueSize, "set");
     await engine.start(ride.id);
 
     expect(offers).toHaveLength(1);
     expect(offers[0]?.driverUserId).toBe(near.user.id);
     expect(offers[0]?.payload.ride_id).toBe(ride.id);
     expect(offers[0]?.payload.price_cents).toBeGreaterThan(0);
+    expect(queueGaugeSpy).toHaveBeenLastCalledWith(1);
 
+    const durationSpy = vi.spyOn(matchingSearchDuration, "observe");
     const offerId = offers[0]!.payload.offer_id;
     const updated = await engine.handleAccept(offerId, near.user.id);
 
     expect(updated.status).toBe("assigned");
     expect(updated.driverId).toBe(near.driver.id);
     expect(statuses.at(-1)?.status).toBe("assigned");
+    expect(durationSpy).toHaveBeenCalledWith({ outcome: "assigned" }, expect.any(Number));
+    expect(queueGaugeSpy).toHaveBeenLastCalledWith(0);
 
     const acceptedOffer = await prisma.rideOffer.findUnique({ where: { id: offerId } });
     expect(acceptedOffer?.status).toBe("accepted");
+
+    queueGaugeSpy.mockRestore();
+    durationSpy.mockRestore();
   });
 
   it("moves to the next driver on rejection", async () => {
@@ -359,8 +368,12 @@ describe.runIf(shouldRun)("MatchingEngine", () => {
     const ride = await searchingRide(passenger.id);
 
     const { engine, scheduler, cancels } = buildEngine();
+    const durationSpy = vi.spyOn(matchingSearchDuration, "observe");
     await engine.start(ride.id);
     await engine.cancel(ride.id, "passenger");
+
+    expect(durationSpy).toHaveBeenCalledWith({ outcome: "cancelled" }, expect.any(Number));
+    durationSpy.mockRestore();
 
     const finalRide = await prisma.ride.findUnique({ where: { id: ride.id } });
     expect(finalRide?.status).toBe("cancelled");

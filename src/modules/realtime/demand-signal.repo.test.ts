@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { demandDriversOnline, demandRequestsRecent } from "../../lib/metrics.js";
 import {
   DRIVER_PRESENCE_WINDOW_MS,
   getDemandRatio,
   gridCell,
   recordDriverPresence,
   recordRideRequest,
+  snapshotDemandMetrics,
 } from "./demand-signal.repo.js";
 
 const shouldRun = process.env.RUN_DB_TESTS === "1";
@@ -68,5 +70,39 @@ describe.runIf(shouldRun)("demand signal repo", () => {
     const ratio = await getDemandRatio(redis, point);
     expect(ratio).toBeGreaterThan(1);
     expect(gridCell(point)).not.toBe(gridCell(farAway));
+  });
+
+  describe("snapshotDemandMetrics", () => {
+    it("publishes a gauge value per active cell", async () => {
+      await recordDriverPresence(redis, randomUUID(), point);
+      await recordDriverPresence(redis, randomUUID(), point);
+      await recordRideRequest(redis, point);
+
+      await snapshotDemandMetrics(redis);
+
+      const cell = gridCell(point);
+      expect((await demandDriversOnline.get()).values).toContainEqual(
+        expect.objectContaining({ labels: { cell }, value: 2 }),
+      );
+      expect((await demandRequestsRecent.get()).values).toContainEqual(
+        expect.objectContaining({ labels: { cell }, value: 1 }),
+      );
+    });
+
+    it("drops a cell from the gauge once it has no recent activity", async () => {
+      const cell = gridCell(point);
+      await recordRideRequest(redis, point);
+      await snapshotDemandMetrics(redis);
+      expect((await demandRequestsRecent.get()).values).toContainEqual(
+        expect.objectContaining({ labels: { cell } }),
+      );
+
+      await redis.del(`demand:requests:${cell}`, `demand:drivers:${cell}`);
+      await snapshotDemandMetrics(redis);
+
+      expect((await demandRequestsRecent.get()).values).not.toContainEqual(
+        expect.objectContaining({ labels: { cell } }),
+      );
+    });
   });
 });
