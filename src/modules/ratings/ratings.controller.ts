@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { authUserId } from "../auth/auth-user.js";
+import { trustScoreCacheKey } from "../trust-score/trust-score.cache.js";
 import { serializeRating } from "./rating.serializer.js";
 
 interface CreateRatingBody {
@@ -52,6 +53,7 @@ export async function createRating(req: FastifyRequest, reply: FastifyReply) {
         updatedById: raterId,
       },
     });
+    void req.server.redis.del(trustScoreCacheKey(rateeId)).catch(() => {});
     return reply.ok({ rating: serializeRating(rating) }, "Avaliação registrada", 201);
   } catch (error) {
     if ((error as { code?: string }).code === "P2002") {
