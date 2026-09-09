@@ -1,7 +1,7 @@
 import fp from "fastify-plugin";
 import { MatchingEngine } from "../modules/matching/matching.engine.js";
 import { createSocketMatchingNotifier } from "../modules/matching/matching.notifier.js";
-import { getTrustScore } from "../modules/trust-score/trust-score.service.js";
+import { getCachedTrustScore } from "../modules/trust-score/trust-score.cache.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -15,7 +15,7 @@ export const matchingPlugin = fp(
       prisma: app.prisma,
       redis: app.redis,
       notifier: createSocketMatchingNotifier(app.io),
-      trust: { getTrust: (userId) => getTrustScore(app.prisma, userId) },
+      trust: { getTrust: (userId) => getCachedTrustScore(app.prisma, app.redis, userId) },
       logger: app.log,
     });
 

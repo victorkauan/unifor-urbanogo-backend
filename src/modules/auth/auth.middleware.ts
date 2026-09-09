@@ -7,14 +7,21 @@ declare module "fastify" {
   }
 }
 
-export async function verifyJwt(req: FastifyRequest, reply: FastifyReply) {
-  const authHeader = req.headers.authorization;
+const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
 
-  if (!authHeader) {
+export function extractBearerToken(header: string | undefined): string | null {
+  if (!header) {
+    return null;
+  }
+  const token = BEARER_PATTERN.exec(header.trim())?.[1]?.trim();
+  return token && token.length > 0 ? token : null;
+}
+
+export async function verifyJwt(req: FastifyRequest, reply: FastifyReply) {
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) {
     return reply.fail(401, "Token não informado");
   }
-
-  const token = authHeader.replace("Bearer ", "");
 
   try {
     const { sub } = verifyToken(token);
