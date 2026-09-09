@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from "fastify";
-import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
+import {
+  hasZodFastifySchemaValidationErrors,
+  serializerCompiler,
+  validatorCompiler,
+} from "fastify-type-provider-zod";
 import { config } from "./lib/config.js";
 import { AppError } from "./lib/errors.js";
 import { responsePlugin } from "./lib/response.js";
@@ -13,6 +17,7 @@ import { userRoutes } from "./modules/users/users.routes.js";
 import { driverRoutes } from "./modules/drivers/drivers.routes.js";
 import { ratingRoutes } from "./modules/ratings/ratings.routes.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
+import { offerRoutes } from "./modules/offers/offers.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -40,20 +45,6 @@ export async function buildApp() {
     return payload;
   });
 
-  await app.register(responsePlugin);
-  await app.register(prismaPlugin);
-  await app.register(redisPlugin);
-  await app.register(socketPlugin);
-  await app.register(matchingPlugin);
-
-  await app.register(healthRoutes);
-  await app.register(userRoutes, { prefix: "/users" });
-  await app.register(authRoutes, { prefix: "/auth" });
-
-  await app.register(ratingRoutes, { prefix: "/ratings" });
-
-  await app.register(driverRoutes, { prefix: "/drivers" });
-
   app.setNotFoundHandler((req, reply) => {
     reply.fail(404, `Rota não encontrada: ${req.method} ${req.url}`);
   });
@@ -61,6 +52,17 @@ export async function buildApp() {
   app.setErrorHandler((error: FastifyError, req: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof AppError) {
       return reply.fail(error.statusCode, error.message, error.data);
+    }
+
+    if (hasZodFastifySchemaValidationErrors(error)) {
+      const errors = error.validation.map((entry) => {
+        const issue = entry.params.issue;
+        return {
+          path: issue.path.length > 0 ? issue.path.join(".") : (entry.instancePath ?? ""),
+          message: issue.message,
+        };
+      });
+      return reply.fail(422, "Payload inválido", { errors });
     }
 
     if (error.validation) {
@@ -78,6 +80,19 @@ export async function buildApp() {
     }
     return reply.fail(status, error.message);
   });
+
+  await app.register(responsePlugin);
+  await app.register(prismaPlugin);
+  await app.register(redisPlugin);
+  await app.register(socketPlugin);
+  await app.register(matchingPlugin);
+
+  await app.register(healthRoutes);
+  await app.register(userRoutes, { prefix: "/users" });
+  await app.register(authRoutes, { prefix: "/auth" });
+  await app.register(ratingRoutes, { prefix: "/ratings" });
+  await app.register(driverRoutes, { prefix: "/drivers" });
+  await app.register(offerRoutes, { prefix: "/offers" });
 
   return app;
 }

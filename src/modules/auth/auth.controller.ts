@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { signToken } from "../../lib/jwt.js";
 const prisma = new PrismaClient();
 
 type RegisterBody = {
@@ -51,9 +51,7 @@ export async function login(req: FastifyRequest<{ Body: LoginBody }>, reply: Fas
     return reply.fail(401, "Invalid credentials");
   }
 
-  const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET as string, {
-    expiresIn: "7d",
-  });
+  const token = signToken({ sub: user.id }, "7d");
 
   return reply.send({ token });
 }

@@ -101,8 +101,9 @@ export class MatchingEngine {
       limit: this.config.maxCandidates,
     });
 
+    const available = await this.dropBusyDrivers(nearby);
     const candidates: RankableCandidate[] = await Promise.all(
-      nearby.map(async (driver) => ({
+      available.map(async (driver) => ({
         driverId: driver.driverId,
         userId: driver.userId,
         distanceKm: driver.distanceKm,
@@ -349,6 +350,28 @@ export class MatchingEngine {
         ) * 1000,
       );
     return calculateFare({ distanceMeters }).amount_cents;
+  }
+
+  private async dropBusyDrivers<T extends { driverId: string }>(drivers: T[]): Promise<T[]> {
+    if (drivers.length === 0) {
+      return drivers;
+    }
+    const driverIds = drivers.map((driver) => driver.driverId);
+    const [pendingOffers, activeRides] = await Promise.all([
+      this.prisma.rideOffer.findMany({
+        where: { driverId: { in: driverIds }, status: "pending" },
+        select: { driverId: true },
+      }),
+      this.prisma.ride.findMany({
+        where: { driverId: { in: driverIds }, status: { in: ["assigned", "in_progress"] } },
+        select: { driverId: true },
+      }),
+    ]);
+    const busy = new Set([
+      ...pendingOffers.map((offer) => offer.driverId),
+      ...activeRides.map((ride) => ride.driverId),
+    ]);
+    return drivers.filter((driver) => !busy.has(driver.driverId));
   }
 
   private async requirePendingOffer(offerId: string, driverUserId: string) {

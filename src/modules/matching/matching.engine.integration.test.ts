@@ -313,4 +313,43 @@ describe.runIf(shouldRun)("MatchingEngine", () => {
     expect(state?.queue).toHaveLength(1);
     expect(state?.currentIndex).toBe(0);
   });
+
+  it("skips a driver who already has a pending offer or an active ride", async () => {
+    const passenger = await createTestUser(prisma);
+    const other = await createTestUser(prisma);
+    const busyPending = await onlineDriverAt(-3.732, -38.527);
+    const busyAssigned = await onlineDriverAt(-3.733, -38.528);
+    const free = await onlineDriverAt(-3.736, -38.531);
+
+    const pendingRide = await searchingRide(other.id);
+    await prisma.rideOffer.create({
+      data: {
+        rideId: pendingRide.id,
+        driverId: busyPending.driver.id,
+        position: 0,
+        status: "pending",
+        offeredAt: new Date(),
+        expiresAt: new Date(Date.now() + 15_000),
+      },
+    });
+    await prisma.ride.create({
+      data: {
+        passengerId: other.id,
+        driverId: busyAssigned.driver.id,
+        type: "ride",
+        status: "in_progress",
+        originLat: -3.73,
+        originLng: -38.52,
+        destLat: -3.75,
+        destLng: -38.49,
+      },
+    });
+
+    const ride = await searchingRide(passenger.id);
+    const { engine, offers } = buildEngine();
+    await engine.start(ride.id);
+
+    expect(offers).toHaveLength(1);
+    expect(offers[0]?.driverUserId).toBe(free.user.id);
+  });
 });
