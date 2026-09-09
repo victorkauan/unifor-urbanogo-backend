@@ -35,7 +35,7 @@ describe.runIf(shouldRun)("quote route", () => {
       url: "/auth/login",
       payload: { email, password: "password123" },
     });
-    return login.json().token as string;
+    return login.json().data.token as string;
   }
 
   it("returns an estimated price with the full breakdown", async () => {

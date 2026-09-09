@@ -52,7 +52,7 @@ describe.runIf(shouldRun)("ride request routes", () => {
       url: "/auth/login",
       payload: { email, password: "password123" },
     });
-    return { email, token: login.json().token as string };
+    return { email, token: login.json().data.token as string };
   }
 
   async function onlineDriverNearby() {
@@ -79,7 +79,7 @@ describe.runIf(shouldRun)("ride request routes", () => {
       url: "/auth/register",
       payload: { name: "Driver", email, password: "password123", role: "driver" },
     });
-    const userId = register.json().id as string;
+    const userId = register.json().data.user.id as string;
     const login = await app.inject({
       method: "POST",
       url: "/auth/login",
@@ -97,7 +97,7 @@ describe.runIf(shouldRun)("ride request routes", () => {
     await app.prisma.driverLocation.create({
       data: { driverId: driver.id, lat: -3.732, lng: -38.527, recordedAt: new Date() },
     });
-    return { userId, token: login.json().token as string, driver };
+    return { userId, token: login.json().data.token as string, driver };
   }
 
   it("creates a searching ride and dispatches matching", async () => {

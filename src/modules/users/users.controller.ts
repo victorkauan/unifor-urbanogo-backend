@@ -1,99 +1,57 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { PrismaClient } from "@prisma/client";
+import { authUserId } from "../auth/auth-user.js";
+import { serializeUser } from "./user.serializer.js";
 
-const prisma = new PrismaClient();
-
-type UpdateProfileBody = {
+interface UpdateMeBody {
   name?: string;
   phone?: string;
-};
-
-export async function getProfile(req: FastifyRequest, reply: FastifyReply) {
-  const userId = (req as FastifyRequest & { user?: { id: string } }).user?.id;
-
-  if (!userId) {
-    return reply.fail(401, "User not authenticated");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId, deletedAt: null },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      role: true,
-      createdAt: true,
-    },
-  });
-
-  if (!user) {
-    return reply.fail(404, "User not found");
-  }
-
-  return reply.send(user);
 }
 
-export async function updateProfile(
-  req: FastifyRequest<{ Body: UpdateProfileBody }>,
-  reply: FastifyReply,
-) {
-  const userId = (req as FastifyRequest & { user?: { id: string } }).user?.id;
-  const { name, phone } = req.body;
-
+async function currentUser(req: FastifyRequest) {
+  const userId = authUserId(req);
   if (!userId) {
-    return reply.fail(401, "User not authenticated");
+    return null;
   }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId, deletedAt: null },
-  });
-
-  if (!user) {
-    return reply.fail(404, "User not found");
-  }
-
-  const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...(name && { name }),
-      ...(phone !== undefined && { phone }),
-      updatedById: userId,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      role: true,
-    },
-  });
-
-  return reply.send(updatedUser);
+  return req.server.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
 }
 
-export async function deleteProfile(req: FastifyRequest, reply: FastifyReply) {
-  const userId = (req as FastifyRequest & { user?: { id: string } }).user?.id;
-
-  if (!userId) {
-    return reply.fail(401, "User not authenticated");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId, deletedAt: null },
-  });
-
+export async function getMe(req: FastifyRequest, reply: FastifyReply) {
+  const user = await currentUser(req);
   if (!user) {
-    return reply.fail(404, "User not found");
+    return reply.fail(401, "Não autenticado");
+  }
+  return reply.ok({ user: serializeUser(user) }, "Perfil do usuário");
+}
+
+export async function updateMe(req: FastifyRequest, reply: FastifyReply) {
+  const user = await currentUser(req);
+  if (!user) {
+    return reply.fail(401, "Não autenticado");
   }
 
-  await prisma.user.update({
-    where: { id: userId },
+  const { name, phone } = req.body as UpdateMeBody;
+  const updated = await req.server.prisma.user.update({
+    where: { id: user.id },
     data: {
-      deletedAt: new Date(),
-      deletedById: userId,
+      ...(name !== undefined ? { name } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      updatedById: user.id,
     },
   });
 
-  return reply.status(204).send();
+  return reply.ok({ user: serializeUser(updated) }, "Perfil atualizado");
+}
+
+export async function deleteMe(req: FastifyRequest, reply: FastifyReply) {
+  const user = await currentUser(req);
+  if (!user) {
+    return reply.fail(401, "Não autenticado");
+  }
+
+  await req.server.prisma.user.update({
+    where: { id: user.id },
+    data: { deletedAt: new Date(), deletedById: user.id },
+  });
+
+  return reply.ok(null, "Conta removida");
 }

@@ -31,14 +31,14 @@ describe.runIf(shouldRun)("offer accept/reject routes", () => {
       url: "/auth/register",
       payload: { name: `Driver ${suffix}`, email, password, role: "driver" },
     });
-    const userId = registered.json().id as string;
+    const userId = registered.json().data.user.id as string;
 
     const login = await app.inject({
       method: "POST",
       url: "/auth/login",
       payload: { email, password },
     });
-    const token = login.json().token as string;
+    const token = login.json().data.token as string;
 
     return { userId, token };
   }
