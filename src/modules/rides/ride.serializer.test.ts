@@ -22,6 +22,7 @@ const baseRide = {
   completedAt: null,
   cancelledAt: null,
   cancelledBy: null,
+  cancelledReason: null,
 } as unknown as RideForResponse;
 
 describe("serializeRide", () => {
@@ -38,7 +39,24 @@ describe("serializeRide", () => {
       currency: "BRL",
       requested_at: "2026-09-09T10:00:00.000Z",
       assigned_at: null,
+      cancelled_by: null,
+      cancellation_reason: null,
     });
+  });
+
+  it("exposes who cancelled the ride and why", () => {
+    const cancelled = {
+      ...baseRide,
+      status: "cancelled",
+      cancelledBy: "passenger",
+      cancelledAt: new Date("2026-09-09T10:02:00Z"),
+      cancelledReason: "mudei de ideia",
+    } as unknown as RideForResponse;
+
+    const dto = serializeRide(cancelled);
+    expect(dto.cancelled_by).toBe("passenger");
+    expect(dto.cancelled_at).toBe("2026-09-09T10:02:00.000Z");
+    expect(dto.cancellation_reason).toBe("mudei de ideia");
   });
 
   it("includes the assigned driver and its trust score", () => {

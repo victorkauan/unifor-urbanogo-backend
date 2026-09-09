@@ -31,8 +31,9 @@ describe.runIf(shouldRun)("ride request routes", () => {
   });
 
   afterEach(async () => {
-    await resetDatabase(app.prisma);
+    app.matching.stopAll();
     await app.redis.flushall();
+    await resetDatabase(app.prisma);
   });
 
   afterAll(async () => {
@@ -69,6 +70,34 @@ describe.runIf(shouldRun)("ride request routes", () => {
       data: { driverId: driver.id, lat: -3.732, lng: -38.527, recordedAt: new Date() },
     });
     return driver;
+  }
+
+  async function onlineDriverWithToken() {
+    const email = `rdriver-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const register = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: { name: "Driver", email, password: "password123", role: "driver" },
+    });
+    const userId = register.json().id as string;
+    const login = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email, password: "password123" },
+    });
+    const driver = await app.prisma.driver.create({
+      data: {
+        userId,
+        servicePreference: "both",
+        isOnline: true,
+        vehicleModel: "Onix",
+        vehiclePlate: "ABC1D23",
+      },
+    });
+    await app.prisma.driverLocation.create({
+      data: { driverId: driver.id, lat: -3.732, lng: -38.527, recordedAt: new Date() },
+    });
+    return { userId, token: login.json().token as string, driver };
   }
 
   it("creates a searching ride and dispatches matching", async () => {
@@ -125,8 +154,8 @@ describe.runIf(shouldRun)("ride request routes", () => {
     const { token } = await passengerToken();
     const headers = { authorization: `Bearer ${token}` };
 
-    const first = await app.inject({ method: "POST", url: "/rides", headers, payload: VALID_BODY });
-    expect(first.statusCode).toBe(201);
+    const rideId = await createRide(token);
+    expect(rideId).toBeTruthy();
 
     const second = await app.inject({
       method: "POST",
@@ -138,14 +167,9 @@ describe.runIf(shouldRun)("ride request routes", () => {
   });
 
   it("lets the passenger read their ride and blocks outsiders", async () => {
+    await onlineDriverNearby();
     const { token } = await passengerToken();
-    const created = await app.inject({
-      method: "POST",
-      url: "/rides",
-      headers: { authorization: `Bearer ${token}` },
-      payload: VALID_BODY,
-    });
-    const rideId = created.json().data.ride.id as string;
+    const rideId = await createRide(token);
 
     const own = await app.inject({
       method: "GET",
@@ -172,5 +196,154 @@ describe.runIf(shouldRun)("ride request routes", () => {
       headers: { authorization: `Bearer ${token}` },
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  async function settleMatching(rideId: string) {
+    await waitFor(async () => {
+      const [offers, ride] = await Promise.all([
+        app.prisma.rideOffer.count({ where: { rideId } }),
+        app.prisma.ride.findUnique({ where: { id: rideId }, select: { status: true } }),
+      ]);
+      return offers > 0 || ride?.status !== "searching";
+    });
+  }
+
+  async function createRide(token: string) {
+    const created = await app.inject({
+      method: "POST",
+      url: "/rides",
+      headers: { authorization: `Bearer ${token}` },
+      payload: VALID_BODY,
+    });
+    const rideId = created.json().data.ride.id as string;
+    await settleMatching(rideId);
+    return rideId;
+  }
+
+  async function assignRide(rideId: string, driverUserId: string) {
+    await waitFor(async () => (await app.prisma.rideOffer.count({ where: { rideId } })) > 0);
+    const offer = await app.prisma.rideOffer.findFirstOrThrow({
+      where: { rideId },
+      orderBy: { offeredAt: "desc" },
+    });
+    await app.matching.handleAccept(offer.id, driverUserId);
+  }
+
+  it("lets the passenger cancel a searching ride", async () => {
+    await onlineDriverNearby();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/cancel`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { reason: "mudei de ideia" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.ride.status).toBe("cancelled");
+    expect(res.json().data.ride.cancellation_reason).toBe("mudei de ideia");
+    const stored = await app.prisma.ride.findUnique({ where: { id: rideId } });
+    expect(stored?.status).toBe("cancelled");
+    expect(stored?.cancelledBy).toBe("passenger");
+    expect(stored?.cancelledAt).not.toBeNull();
+    expect(stored?.cancelledReason).toBe("mudei de ideia");
+  });
+
+  it("lets the assigned driver cancel the ride", async () => {
+    const driver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    await assignRide(rideId, driver.userId);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/cancel`,
+      headers: { authorization: `Bearer ${driver.token}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.ride.status).toBe("cancelled");
+    const stored = await app.prisma.ride.findUnique({ where: { id: rideId } });
+    expect(stored?.cancelledBy).toBe("driver");
+  });
+
+  it("forbids a driver from cancelling a ride before being assigned", async () => {
+    await onlineDriverNearby();
+    const otherDriver = await onlineDriverWithToken();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/cancel`,
+      headers: { authorization: `Bearer ${otherDriver.token}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("blocks an outsider from cancelling", async () => {
+    await onlineDriverNearby();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    const outsider = await passengerToken();
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/rides/${rideId}/cancel`,
+      headers: { authorization: `Bearer ${outsider.token}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("returns 409 when cancelling an already cancelled ride", async () => {
+    await onlineDriverNearby();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+    const headers = { authorization: `Bearer ${token}` };
+
+    const first = await app.inject({ method: "POST", url: `/rides/${rideId}/cancel`, headers });
+    expect(first.statusCode).toBe(200);
+    const second = await app.inject({ method: "POST", url: `/rides/${rideId}/cancel`, headers });
+    expect(second.statusCode).toBe(409);
+  });
+
+  it("returns 404 when cancelling an unknown ride", async () => {
+    const { token } = await passengerToken();
+    const res = await app.inject({
+      method: "POST",
+      url: "/rides/00000000-0000-4000-8000-000000000000/cancel",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("lists the caller's rides with pagination and a status filter", async () => {
+    await onlineDriverNearby();
+    const { token } = await passengerToken();
+    const rideId = await createRide(token);
+
+    const all = await app.inject({
+      method: "GET",
+      url: "/rides",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(all.statusCode).toBe(200);
+    expect(all.json().data).toMatchObject({ page: 1, page_size: 20, total: 1 });
+    expect(all.json().data.items.map((r: { id: string }) => r.id)).toContain(rideId);
+
+    const searching = await app.inject({
+      method: "GET",
+      url: "/rides?status=searching",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(searching.json().data.total).toBe(1);
+
+    const completed = await app.inject({
+      method: "GET",
+      url: "/rides?status=completed",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(completed.json().data.total).toBe(0);
   });
 });
