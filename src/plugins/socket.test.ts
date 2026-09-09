@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
 import { buildApp, type AppInstance } from "../app.js";
 import { signToken } from "../lib/jwt.js";
+import { positionUpdateLatency } from "../lib/metrics.js";
 import {
   DRIVER_LOCATION_TTL_SECONDS,
   driverLocationKey,
@@ -166,6 +167,7 @@ describe("server-side position broadcast (RT-4)", () => {
     const findFirstSpy = vi
       .spyOn(app.prisma.ride, "findFirst")
       .mockResolvedValue({ id: rideId } as never);
+    const latencySpy = vi.spyOn(positionUpdateLatency, "observe");
 
     const passenger = connect(signToken({ sub: randomUUID() }));
     const driver = connect(signToken({ sub: driverUserId }));
@@ -187,10 +189,12 @@ describe("server-side position broadcast (RT-4)", () => {
 
     expect(msg.ride_id).toBe(rideId);
     expect(msg.predicted).toBe(false);
+    expect(latencySpy).toHaveBeenCalledWith(expect.any(Number));
 
     redisSetSpy.mockRestore();
     restoreAll(demandSpies);
     findFirstSpy.mockRestore();
+    latencySpy.mockRestore();
     passenger.close();
     driver.close();
   });

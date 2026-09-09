@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { FastifyBaseLogger } from "fastify";
+import { positionUpdateLatency } from "../../lib/metrics.js";
 import { findActiveRideIdForDriver } from "./ride-tracking.repo.js";
 import { rideRoom, type RealtimeServer } from "./realtime.gateway.js";
 import type { DriverLocationEvent } from "./realtime.schema.js";
@@ -118,6 +119,7 @@ export function createPositionTracker(
 
       broadcast(rideId, location, false);
       const latencyMs = now - Date.parse(location.recorded_at);
+      positionUpdateLatency.observe(latencyMs / 1000);
       log.info({ rideId, latencyMs }, "posição consolidada enviada para a sala da corrida");
 
       if (state?.predictedTimeout) {
