@@ -9,6 +9,8 @@ declare module "fastify" {
   }
 }
 
+const RECONCILE_INTERVAL_MS = 30_000;
+
 export const matchingPlugin = fp(
   async (app) => {
     const engine = new MatchingEngine({
@@ -21,7 +23,15 @@ export const matchingPlugin = fp(
 
     app.decorate("matching", engine);
 
+    const reconcileTimer = setInterval(() => {
+      engine.reconcileStale().catch((err: unknown) => {
+        app.log.error({ err }, "falha ao reconciliar buscas travadas do matching");
+      });
+    }, RECONCILE_INTERVAL_MS);
+    reconcileTimer.unref();
+
     app.addHook("onClose", async () => {
+      clearInterval(reconcileTimer);
       engine.stopAll();
     });
   },
