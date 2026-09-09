@@ -5,6 +5,7 @@ export const rideResponseInclude = {
   driver: {
     select: {
       id: true,
+      userId: true,
       vehicleModel: true,
       vehiclePlate: true,
       user: { select: { name: true } },

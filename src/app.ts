@@ -18,6 +18,7 @@ import { driverRoutes } from "./modules/drivers/drivers.routes.js";
 import { ratingRoutes } from "./modules/ratings/ratings.routes.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { offerRoutes } from "./modules/offers/offers.routes.js";
+import { rideRoutes } from "./modules/rides/rides.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -93,6 +94,7 @@ export async function buildApp() {
   await app.register(ratingRoutes, { prefix: "/ratings" });
   await app.register(driverRoutes, { prefix: "/drivers" });
   await app.register(offerRoutes, { prefix: "/offers" });
+  await app.register(rideRoutes, { prefix: "/rides" });
 
   return app;
 }
