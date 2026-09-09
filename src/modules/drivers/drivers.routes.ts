@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FastifyPluginAsyncZod } from "fastify-type-provider-zod";
-import { getProfile, updateProfile } from "./drivers.controller.js";
+import { getProfile, updateProfile, updateStatus } from "./drivers.controller.js";
 
 export const driverRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get("/profile", getProfile);
@@ -17,5 +17,17 @@ export const driverRoutes: FastifyPluginAsyncZod = async (app) => {
       },
     },
     updateProfile,
+  );
+
+  app.patch(
+    "/status",
+    {
+      schema: {
+        body: z.object({
+          isOnline: z.boolean(),
+        }),
+      },
+    },
+    updateStatus,
   );
 };
