@@ -1,0 +1,36 @@
+# Reverse proxy da stack de producao. Caddy cuida do TLS sozinho:
+# Let's Encrypt quando PUBLIC_HOST e um dominio publico (ex.: sslip.io),
+# CA interna quando e "localhost" ou um nome sem DNS publico.
+#
+# PUBLIC_HOST vem do .env (ex.: 203-0-113-10.sslip.io).
+
+# /metrics (API e Grafana) e servido sem autenticacao; o Prometheus le pela
+# rede interna do Compose. Bloqueado na borda em todos os hosts.
+(block-metrics) {
+	@metrics path /metrics /metrics/*
+	respond @metrics 403
+}
+
+{$PUBLIC_HOST} {
+	import block-metrics
+
+	reverse_proxy api:3000
+
+	encode gzip
+	log {
+		output stdout
+		format console
+	}
+}
+
+grafana.{$PUBLIC_HOST} {
+	import block-metrics
+
+	reverse_proxy grafana:3000
+
+	encode gzip
+	log {
+		output stdout
+		format console
+	}
+}
