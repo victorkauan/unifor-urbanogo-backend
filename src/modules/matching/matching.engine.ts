@@ -216,8 +216,11 @@ export class MatchingEngine {
     return updatedRide;
   }
 
-  async cancel(rideId: string): Promise<void> {
-    await this.fail(rideId, "cancelled");
+  async cancel(
+    rideId: string,
+    cancelledBy: "passenger" | "driver" | "system" = "system",
+  ): Promise<void> {
+    await this.fail(rideId, "cancelled", cancelledBy);
   }
 
   private async offerNext(rideId: string): Promise<void> {
@@ -294,7 +297,11 @@ export class MatchingEngine {
     await this.offerNext(rideId);
   }
 
-  private async fail(rideId: string, reason: MatchingFailureReason): Promise<void> {
+  private async fail(
+    rideId: string,
+    reason: MatchingFailureReason,
+    cancelledBy: "passenger" | "driver" | "system" = "system",
+  ): Promise<void> {
     const state = await getSearchState(this.redis, rideId);
     if (state && state.status !== "searching") {
       return;
@@ -312,7 +319,13 @@ export class MatchingEngine {
     });
     const nextStatus = reason === "cancelled" ? "cancelled" : "expired";
     if (ride?.status === "searching") {
-      await this.prisma.ride.update({ where: { id: rideId }, data: { status: nextStatus } });
+      await this.prisma.ride.update({
+        where: { id: rideId },
+        data:
+          nextStatus === "cancelled"
+            ? { status: "cancelled", cancelledBy, cancelledAt: new Date(this.now()) }
+            : { status: "expired" },
+      });
     }
 
     if (state) {

@@ -352,4 +352,21 @@ describe.runIf(shouldRun)("MatchingEngine", () => {
     expect(offers).toHaveLength(1);
     expect(offers[0]?.driverUserId).toBe(free.user.id);
   });
+
+  it("cancel() stops the search and records who cancelled", async () => {
+    const passenger = await createTestUser(prisma);
+    await onlineDriverAt(-3.732, -38.527);
+    const ride = await searchingRide(passenger.id);
+
+    const { engine, scheduler, cancels } = buildEngine();
+    await engine.start(ride.id);
+    await engine.cancel(ride.id, "passenger");
+
+    const finalRide = await prisma.ride.findUnique({ where: { id: ride.id } });
+    expect(finalRide?.status).toBe("cancelled");
+    expect(finalRide?.cancelledBy).toBe("passenger");
+    expect(finalRide?.cancelledAt).not.toBeNull();
+    expect(cancels).toEqual([{ rideId: ride.id, reason: "cancelled" }]);
+    expect(scheduler.activeCount()).toBe(0);
+  });
 });
