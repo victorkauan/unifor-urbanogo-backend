@@ -169,6 +169,12 @@
         chdir: "{{ app_dir }}"
       changed_when: true
 
+    - name: Pick up config-only changes to the edge and monitoring
+      ansible.builtin.command:
+        cmd: docker compose -f docker-compose.prod.yml restart caddy prometheus grafana
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
     - name: Drop unused images
       ansible.builtin.command:
         cmd: docker image prune -f
