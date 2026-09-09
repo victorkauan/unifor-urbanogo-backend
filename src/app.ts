@@ -8,6 +8,7 @@ import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
 import { socketPlugin } from "./plugins/socket.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
+import { userRoutes } from "./modules/users/users.routes.js";
 import { driverRoutes } from "./modules/drivers/drivers.routes.js";
 import { ratingRoutes } from "./modules/ratings/ratings.routes.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
@@ -44,6 +45,7 @@ export async function buildApp() {
   await app.register(socketPlugin);
 
   await app.register(healthRoutes);
+  await app.register(userRoutes, { prefix: "/users" });
   await app.register(authRoutes, { prefix: "/auth" });
 
   await app.register(ratingRoutes, { prefix: "/ratings" });
