@@ -17,8 +17,8 @@ flowchart TB
     UNIT --- INTEGRACAO --- E2E
 ```
 
-Hoje (16/17 dos módulos de negócio já implementados): **31 arquivos de teste,
-179 testes**. Rodam em ~15-30s localmente com Docker disponível.
+Hoje: **35 arquivos de teste, 199 testes**. Rodam em ~15-30s localmente com
+Docker disponível.
 
 ## O que é cada nível aqui
 
@@ -53,23 +53,20 @@ por como o teste declara sua necessidade de infraestrutura real:
 ## Cobertura
 
 Sem gate de CI por enquanto (rodar `npm run test:coverage` é manual). Linha
-de base, medida com Docker/`RUN_DB_TESTS` ligado, em 2026-09-09:
+de base, medida com Docker/`RUN_DB_TESTS` ligado, em 2026-09-10:
 
 | Área | Cobertura (linhas) | Observação |
 |---|---|---|
-| Geral | **91,4%** | acima da meta abaixo, mas com desequilíbrio por módulo |
-| `src/modules/trust-score` | 59,4% | `trust-score.service.ts` (integração com a LLM via DeepInfra, URB-47) em 41% — o caminho de erro/fallback da chamada externa está fraco |
-| Resto dos módulos de negócio | 85-100% | `rides`, `matching`, `pricing`, `realtime`, `auth` todos acima de 87% |
+| Geral | **89,1%** | plumbing novo (`src/jobs`, plugin de retenção) puxa pra baixo; regras de negócio seguem acima da meta |
+| `src/modules/trust-score` | 96,3% | reforçado no URB-54: `trust-score.service.ts` agora cobre score válido da LLM, clamp, resposta sem conteúdo, score não numérico, exceção (timeout) e histórico vazio |
+| Regras críticas (pricing, state machine da corrida, proximidade) | 87-100% | matriz de transição completa; proximidade tem teste unitário das guardas de entrada além do de integração |
+| `src/jobs`, `src/plugins/location-retention.ts` | baixo | job de retenção coberto pelas rotinas em `src/modules/privacy` (integração); o wiring por `setInterval` não tem teste dedicado |
 
 **Meta**: manter **80%+ de linhas** nas regras de negócio (`src/modules/**`,
 excluindo rotas/serializers triviais) e não deixar cair abaixo disso sem
 justificativa no PR. Não é um número perseguido por si só — 100% em getter
 trivial não vale o esforço, mas caminho de erro de motor de matching,
 precificação e state machine da corrida vale.
-
-**Ação concreta**: reforçar os testes de `trust-score.service.ts` (mock da
-chamada DeepInfra cobrindo timeout, resposta malformada e fallback pra média
-simples) é a lacuna mais clara hoje.
 
 ## Testes de contrato entre app e API
 

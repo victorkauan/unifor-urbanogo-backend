@@ -74,4 +74,10 @@ describe("boundingBox", () => {
     expect(box.minLng).toBeGreaterThanOrEqual(-180);
     expect(box.maxLng).toBeLessThanOrEqual(180);
   });
+
+  it("spans the full longitude range at the poles", () => {
+    const box = boundingBox({ lat: 90, lng: 0 }, 5);
+    expect(box.minLng).toBe(-180);
+    expect(box.maxLng).toBe(180);
+  });
 });
