@@ -8,6 +8,7 @@ import {
 import { config } from "./lib/config.js";
 import { AppError } from "./lib/errors.js";
 import { responsePlugin } from "./lib/response.js";
+import { locationRetentionPlugin } from "./plugins/location-retention.js";
 import { matchingPlugin } from "./plugins/matching.js";
 import { metricsPlugin } from "./plugins/metrics.js";
 import { prismaPlugin } from "./plugins/prisma.js";
@@ -89,6 +90,7 @@ export async function buildApp() {
   await app.register(redisPlugin);
   await app.register(socketPlugin);
   await app.register(matchingPlugin);
+  await app.register(locationRetentionPlugin);
 
   await app.register(healthRoutes);
   await app.register(userRoutes, { prefix: "/users" });

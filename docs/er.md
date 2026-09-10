@@ -54,6 +54,7 @@ erDiagram
         timestamptz cancelled_at
         CancelledBy cancelled_by
         text cancelled_reason "nullable"
+        timestamptz location_anonymized_at "nullable"
     }
     ride_offers {
         uuid id PK
@@ -113,6 +114,8 @@ Uma corrida ou entrega. `status`: `requested` -> `searching` -> `assigned` ->
 (`price_cents`); `price_breakdown` guarda a composição do preço (base, por km,
 multiplicadores, taxa). `driver_id` é nulo até a atribuição e referencia `drivers`.
 Marcos de tempo (`assigned_at`, `started_at`, etc.) para métricas e histórico.
+`location_anonymized_at` marca quando a varredura de retenção (SEC-4) arredondou
+as coordenadas e apagou os endereços; ver `docs/lgpd.md`.
 
 ### ride_offers
 

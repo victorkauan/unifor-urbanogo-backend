@@ -14,6 +14,9 @@ const schema = z.object({
     z.string().min(1).optional(),
   ),
   DEEPINFRA_TRUST_MODEL: z.string().default("meta-llama/Meta-Llama-3.3-70B-Instruct"),
+  RIDE_LOCATION_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  DRIVER_LOCATION_RETENTION_HOURS: z.coerce.number().int().positive().default(24),
+  LOCATION_RETENTION_SWEEP_HOURS: z.coerce.number().int().positive().default(24),
 });
 
 const parsed = schema.safeParse(process.env);

@@ -60,17 +60,20 @@ por ora, de categorias sensíveis.
   A geolocalização precisa é o dado mais sensível do produto: o histórico de
   trajetos depende de **consentimento** específico e destacado (art. 7, I), com
   opção de recusar sem perder o serviço de corrida.
-* **Retenção**:
+* **Retenção** (aplicada pela varredura do SEC-4, ver a seção final):
   * Redis (posição atual e demanda): efêmero, expira sozinho em segundos. Nada a
     fazer.
   * `driver_locations` no Postgres: só a última posição, sobrescrita a cada
-    atualização. Ao ficar offline ou 24h sem atualizar, apagar a linha.
-  * `rides.origin/dest` lat/lng e endereços: mantidos com a corrida por **18
-    meses** (janela de disputa e conciliação financeira). Depois disso,
-    arredondar as coordenadas para ~1 km e apagar os campos de endereço.
-  * Histórico de posições (SEC-4): manter os pontos brutos por **90 dias**.
-    Depois, anonimizar (remover `driver_id` e `ride_id`, arredondar lat/lng) ou
-    apagar. É o alvo principal do job do URB-65.
+    atualização. Linhas sem atualização há mais de `DRIVER_LOCATION_RETENTION_HOURS`
+    (padrão 24h), ou seja de motorista offline, são apagadas.
+  * `rides.origin/dest` lat/lng e endereços: são o trajeto preciso que de fato
+    persiste (não há tabela de trilha bruta separada). Mantidos com a corrida por
+    `RIDE_LOCATION_RETENTION_DAYS` (padrão **90 dias**) depois de a corrida
+    encerrar. Passado esse prazo, as coordenadas são arredondadas para 2 casas
+    (~1 km), os endereços viram `NULL` e `rides.location_anonymized_at` é
+    carimbado para não reprocessar. O registro financeiro da corrida (valor,
+    distância, horários) continua pelos 5 anos do grupo 4, já sem localização
+    precisa.
 
 ### 4. Corrida e transação
 
@@ -142,18 +145,38 @@ Nenhum dado pessoal é vendido ou usado para publicidade.
 |---|---|
 | Confirmação e acesso | endpoints de perfil (`GET`) do próprio usuário |
 | Correção | endpoints de perfil (`PATCH`) |
-| Eliminação | exclusão de conta faz soft delete (`deleted_at`); o hard delete/anonimização em 30 dias depende do job do SEC-4 |
+| Eliminação | exclusão de conta faz soft delete (`deleted_at`); a varredura do SEC-4 já anonimiza a localização das corridas encerradas; o hard delete/anonimização do restante do perfil em 30 dias ainda é pendente |
 | Portabilidade | pendente: exportação do perfil, corridas e avaliações em JSON |
 | Revisão de decisão automatizada | pendente: canal para contestar a nota de confiança |
 | Informação sobre compartilhamento | este documento |
 
+## Varredura de retenção de localização (SEC-4, URB-65)
+
+`src/modules/privacy/location-retention.ts` tem duas rotinas idempotentes:
+
+* `anonymizeStaleRideLocations`: arredonda `origin/dest lat/lng` para 2 casas,
+  zera `origin/dest_address` e carimba `location_anonymized_at` nas corridas em
+  estado terminal (`completed`, `cancelled`, `expired`) com `requested_at` há mais
+  de `RIDE_LOCATION_RETENTION_DAYS` dias.
+* `purgeStaleDriverLocations`: apaga as linhas de `driver_locations` com
+  `recorded_at` há mais de `DRIVER_LOCATION_RETENTION_HOURS` horas.
+
+`runLocationRetentionSweep` roda as duas e loga o resumo. Como executa:
+
+* **Em processo**: o plugin `location-retention` dispara a varredura no boot e a
+  cada `LOCATION_RETENTION_SWEEP_HOURS` horas (padrão 24). Desligado quando
+  `NODE_ENV=test`.
+* **Sob demanda / cron**: `npm run privacy:purge-locations`
+  (`tsx src/jobs/location-retention.ts`), para agendar por fora se preferir.
+
+| Variável | Padrão |
+|---|---|
+| `RIDE_LOCATION_RETENTION_DAYS` | 90 |
+| `DRIVER_LOCATION_RETENTION_HOURS` | 24 |
+| `LOCATION_RETENTION_SWEEP_HOURS` | 24 |
+
 ## Pendências que viram tarefa
 
-* **SEC-4 (URB-65)**: job que apaga/anonimiza o histórico de posições após 90
-  dias, arredonda as coordenadas das corridas após 18 meses e limpa
-  `driver_locations` de motoristas offline. Documentar a execução aqui.
-* Índice de retenção configurável por env (`LOCATION_HISTORY_RETENTION_DAYS` e
-  afins) em vez de valores fixos no código.
 * Endpoint de portabilidade (exportar dados do titular em JSON).
 * Fluxo de contestação da nota de confiança (art. 20).
 * Anonimização do IP nos logs após 6 meses.
