@@ -24,6 +24,11 @@ export function buildScenario({ name, driverVusDefault, passengerVusDefault }) {
   const duration = __ENV.DURATION || "2m";
   const driverVus = Number(__ENV.DRIVER_VUS || driverVusDefault);
   const passengerVus = Number(__ENV.PASSENGER_VUS || passengerVusDefault);
+  const reconcileIntervalMs = Number(__ENV.RECONCILE_INTERVAL_MS || 1_000);
+  const thinkTimeS = {
+    min: Number(__ENV.PASSENGER_THINK_MIN_S || 3),
+    max: Number(__ENV.PASSENGER_THINK_MAX_S || 8),
+  };
 
   const matchingLatency = new Trend(`${name}_matching_latency_ms`);
   const rideOutcomes = new Counter(`${name}_ride_outcomes`);
@@ -63,6 +68,8 @@ export function buildScenario({ name, driverVusDefault, passengerVusDefault }) {
       matchingLatency,
       rideOutcomes,
       PASSENGER_MAX_WAIT_MS,
+      thinkTimeS,
+      reconcileIntervalMs,
     );
   }
 

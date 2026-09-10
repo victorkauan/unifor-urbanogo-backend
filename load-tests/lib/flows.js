@@ -94,13 +94,8 @@ export function driverIteration(baseUrl, wsUrl, driver, center, windowMs) {
  * que o cenário pretende (ex.: "2 passageiros por motorista" deixa de
  * significar algo se cada VU vira um loop apertado de retry).
  */
-const PASSENGER_THINK_TIME_S = { min: 3, max: 8 };
-
-function passengerThinkTime() {
-  sleep(
-    PASSENGER_THINK_TIME_S.min +
-      Math.random() * (PASSENGER_THINK_TIME_S.max - PASSENGER_THINK_TIME_S.min),
-  );
+function passengerThinkTime(thinkTimeS) {
+  sleep(thinkTimeS.min + Math.random() * (thinkTimeS.max - thinkTimeS.min));
 }
 
 export function passengerIteration(
@@ -111,6 +106,8 @@ export function passengerIteration(
   matchingLatency,
   rideOutcomes,
   maxWaitMs,
+  thinkTimeS = { min: 3, max: 8 },
+  reconcileIntervalMs = 1_000,
 ) {
   const origin = jitter(center);
   const destination = jitter(center, 3);
@@ -118,7 +115,7 @@ export function passengerIteration(
   const createRes = createRide(baseUrl, passenger.token, { type: "ride", origin, destination });
   check(createRes, { "create ride: 201 or 409": (r) => r.status === 201 || r.status === 409 });
   if (createRes.status !== 201) {
-    passengerThinkTime();
+    passengerThinkTime(thinkTimeS);
     return;
   }
 
@@ -150,7 +147,7 @@ export function passengerIteration(
     socket.on("open", () => {
       socket.send(encodeConnect({ token: passenger.token }));
       socket.send(encodeEvent("ride:join", { ride_id: rideId }));
-      socket.setInterval(reconcile, 1_000);
+      socket.setInterval(reconcile, reconcileIntervalMs);
       socket.setTimeout(() => socket.close(), maxWaitMs);
     });
 
@@ -178,11 +175,11 @@ export function passengerIteration(
 
   if (terminalStatus) {
     rideOutcomes.add(1, { outcome: terminalStatus });
-    passengerThinkTime();
+    passengerThinkTime(thinkTimeS);
     return;
   }
 
   cancelRide(baseUrl, passenger.token, rideId, "load-test: sem desfecho na janela de espera");
   rideOutcomes.add(1, { outcome: "timed_out" });
-  passengerThinkTime();
+  passengerThinkTime(thinkTimeS);
 }

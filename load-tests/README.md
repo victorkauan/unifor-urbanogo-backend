@@ -49,6 +49,14 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 | `DRIVER_VUS` | 10 (rush) / 5 (chuva) | VUs simulando motoristas |
 | `PASSENGER_VUS` | 20 (rush) / 25 (chuva) | VUs simulando passageiros |
 | `CENTER_LAT`, `CENTER_LNG` | Fortaleza (-3.7319, -38.5267) | Centro de onde motoristas e corridas são espalhados (jitter de 1-3km) |
+| `RECONCILE_INTERVAL_MS` | `1000` | De quanto em quanto tempo o passageiro consulta `GET /rides/:id` esperando o "assigned" |
+| `PASSENGER_THINK_MIN_S`, `PASSENGER_THINK_MAX_S` | `3`, `8` | Faixa da pausa do passageiro entre uma tentativa e outra |
+
+Os dois últimos existem pra dar controle fino sobre a taxa total de requisições -
+importante se o ambiente alvo tiver rate limiting (ex.: contra um ambiente
+publicado real, ver `docs/relatorio-teste-de-carga.md`): aumentar o intervalo de
+polling e a pausa do passageiro reduz bastante o número de requisições/minuto sem
+mudar o número de VUs.
 
 Exemplo, pico maior por 5 minutos:
 
