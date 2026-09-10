@@ -17,7 +17,7 @@ flowchart TB
     UNIT --- INTEGRACAO --- E2E
 ```
 
-Hoje: **35 arquivos de teste, 199 testes**. Rodam em ~15-30s localmente com
+Hoje: **36 arquivos de teste, 200 testes**. Rodam em ~15-30s localmente com
 Docker disponível.
 
 ## O que é cada nível aqui
@@ -40,15 +40,16 @@ por como o teste declara sua necessidade de infraestrutura real:
   Cobrem rotas REST completas (auth, rides, offers, ratings, quotes, users,
   drivers), o motor de matching de ponta a ponta, e a ingestão de posição e
   sinal de demanda no Redis.
-* **E2E** — não é uma suíte separada hoje. Os testes de integração de
-  `rides`/`offers`/`matching` já encadeiam fluxos completos dentro do backend
-  (registrar → logar → pedir corrida → matching oferece e o motorista aceita
-  → chegar → iniciar → concluir → avaliar) via `app.inject()` e, em
-  `socket.test.ts`, via cliente Socket.IO real contra um servidor real
-  (porta efêmera, não `inject()`). Isso cobre "ponta a ponta dentro do
-  backend". **Não cobre** o app Flutter: é um repositório separado, ainda em
-  estágio inicial (Matheus), e testar os dois juntos entra quando o app
-  integrar com a API de verdade — não faz sentido antes disso.
+* **E2E** — `rides/ride-flow.e2e.test.ts` (TST-3) é o cenário único que percorre
+  o caminho principal só via `app.inject()`: cadastro → motorista online →
+  solicitação → matching → oferta → aceite → chegada → início → conclusão →
+  avaliação mútua → nota de confiança. `socket.test.ts` complementa com um
+  cliente Socket.IO real contra um servidor real (porta efêmera, não
+  `inject()`), e os testes de integração de `rides`/`offers`/`matching`
+  cobrem os ramos alternativos do mesmo fluxo. Isso cobre "ponta a ponta
+  dentro do backend". **Não cobre** o app Flutter: é um repositório separado,
+  ainda em estágio inicial (Matheus), e testar os dois juntos entra quando o
+  app integrar com a API de verdade — não faz sentido antes disso.
 
 ## Cobertura
 
