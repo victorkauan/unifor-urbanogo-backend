@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fp from "fastify-plugin";
 import { Server } from "socket.io";
+import { corsOrigins } from "../lib/cors.js";
 import { verifyToken } from "../lib/jwt.js";
 import { createPositionTracker } from "../modules/realtime/position-tracker.js";
 import {
@@ -17,7 +18,7 @@ declare module "fastify" {
 export const socketPlugin = fp(
   async (app) => {
     const io: RealtimeServer = new Server(app.server, {
-      cors: { origin: "*" },
+      cors: { origin: corsOrigins() },
     });
 
     io.use((socket, next) => {

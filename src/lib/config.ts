@@ -17,6 +17,9 @@ const schema = z.object({
   RIDE_LOCATION_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   DRIVER_LOCATION_RETENTION_HOURS: z.coerce.number().int().positive().default(24),
   LOCATION_RETENTION_SWEEP_HOURS: z.coerce.number().int().positive().default(24),
+  CORS_ORIGINS: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
 });
 
 const parsed = schema.safeParse(process.env);
