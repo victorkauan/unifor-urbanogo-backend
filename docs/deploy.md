@@ -84,8 +84,23 @@ cd /opt/urbanogo
 docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs -f api
 docker compose -f docker-compose.prod.yml --profile tools run --rm migrate
+docker compose -f docker-compose.prod.yml --profile tools run --rm seed   # dados de demo
 docker compose -f docker-compose.prod.yml up -d --build      # redeploy manual
 ```
+
+`seed` popula 6 passageiros e 10 motoristas em Fortaleza (8 online) para a demo. É
+one-shot, não sobe no `up`, e o playbook **não** roda automaticamente (o seed é
+idempotente, mas repovoar dados de teste após uma limpeza não é o desejado).
+Roda pelo estágio `build` da imagem porque usa `tsx`.
+
+Todas as contas de exemplo têm a senha **`urbanogo123`** (sobrescreva com
+`SEED_PASSWORD`). Úteis para a demo: `john.doe@example.com` (passageiro),
+`jane.doe@example.com` (motorista). Lista completa em `prisma/seed.ts`.
+
+Nota: os motoristas semeados não têm socket conectado, então uma solicitação de
+corrida na demo pode esperar o timeout de oferta (15s) por candidato até chegar
+num motorista de verdade logado. Para um fluxo de matching instantâneo, conecte um
+motorista real (app ou script) e mantenha poucos motoristas semeados online.
 
 O `.env` de produção fica em `/opt/urbanogo/.env` (modo `0600`), gerado pelo
 playbook a partir de `deploy/ansible/templates/env.j2`. Nunca vai pro git.

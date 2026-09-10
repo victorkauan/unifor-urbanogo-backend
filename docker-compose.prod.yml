@@ -79,6 +79,24 @@ services:
       db:
         condition: service_healthy
 
+  # Popula o banco com dados de demonstração (10 motoristas em Fortaleza, a maioria
+  # online). One-shot, não sobe no `up`. O seed é idempotente (só upsert):
+  #   docker compose -f docker-compose.prod.yml --profile tools run --rm seed
+  # Usa o estágio `build` da imagem porque o seed roda via tsx (devDependency), que
+  # não existe no estágio `runtime` (`npm ci --omit=dev`).
+  seed:
+    build:
+      context: .
+      target: build
+    image: urbanogo-api-build
+    profiles: ["tools"]
+    command: ["npm", "run", "db:seed"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-urbanogo}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-urbanogo}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped

@@ -1,9 +1,14 @@
 import { fileURLToPath } from "node:url";
 import { PrismaClient, type ServicePreference } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-const SEED_PASSWORD_HASH = "dev-seed-password-hash";
+// Senha em claro de todas as contas de exemplo, para conseguir logar na demo.
+// Sobrescreva com SEED_PASSWORD. O hash é gerado com o mesmo bcrypt/rounds do
+// cadastro real (src/modules/auth/auth.controller.ts).
+const SEED_PASSWORD = process.env.SEED_PASSWORD ?? "urbanogo123";
+const SEED_PASSWORD_ROUNDS = 10;
 const FORTALEZA = { lat: -3.7319, lng: -38.5267 };
 const KM_PER_DEGREE_LAT = 111.045;
 
@@ -167,16 +172,17 @@ function spreadPosition(eastKm: number, northKm: number): { lat: number; lng: nu
 
 export async function seed(client: PrismaClient = prisma): Promise<void> {
   const now = new Date();
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, SEED_PASSWORD_ROUNDS);
 
   for (const passenger of passengers) {
     await client.user.upsert({
       where: { email: passenger.email },
-      update: { name: passenger.name, phone: passenger.phone },
+      update: { name: passenger.name, phone: passenger.phone, passwordHash },
       create: {
         name: passenger.name,
         email: passenger.email,
         phone: passenger.phone,
-        passwordHash: SEED_PASSWORD_HASH,
+        passwordHash,
         role: "passenger",
       },
     });
@@ -185,12 +191,12 @@ export async function seed(client: PrismaClient = prisma): Promise<void> {
   for (const driverSeed of drivers) {
     const user = await client.user.upsert({
       where: { email: driverSeed.email },
-      update: { name: driverSeed.name, phone: driverSeed.phone },
+      update: { name: driverSeed.name, phone: driverSeed.phone, passwordHash },
       create: {
         name: driverSeed.name,
         email: driverSeed.email,
         phone: driverSeed.phone,
-        passwordHash: SEED_PASSWORD_HASH,
+        passwordHash,
         role: "driver",
       },
     });
