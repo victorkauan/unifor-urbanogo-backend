@@ -126,6 +126,8 @@ model Ride {
   cancelledBy     CancelledBy? @map("cancelled_by")
   cancelledReason String?      @map("cancelled_reason")
 
+  locationAnonymizedAt DateTime? @map("location_anonymized_at") @db.Timestamptz(6)
+
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
