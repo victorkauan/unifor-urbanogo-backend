@@ -50,3 +50,22 @@ Alguns controles são configuração do repositório, não arquivo. Em
 * **Marcar os checks como obrigatórios**: em **Settings → Branches**, na regra de
   `develop`, exigir os checks `dependency audit`, `secret scan` e
   `static analysis` para permitir o merge.
+
+## Hardening da API (SEC-3)
+
+`src/plugins/security.ts` aplica, em toda a API:
+
+| Controle | Plugin | Config |
+|---|---|---|
+| Cabeçalhos de segurança | `@fastify/helmet` (padrões) | `nosniff`, `X-Frame-Options`, HSTS, etc. |
+| CORS | `@fastify/cors` | `CORS_ORIGINS` (lista separada por vírgula). Vazio reflete qualquer origem e, em produção, loga um aviso. A mesma lista vale para o Socket.IO. |
+| Rate limiting | `@fastify/rate-limit` | `RATE_LIMIT_MAX` (padrão 100) por `RATE_LIMIT_WINDOW_MS` (padrão 60000). Contador no Redis, compartilhado entre instâncias. `/health`, `/ready` e `/metrics` ficam de fora. Estouro devolve `429` no envelope padrão. |
+
+Validação de entrada: toda rota com corpo, parâmetro de path ou query string tem
+schema Zod (`fastify-type-provider-zod`); payload inválido devolve `422` com a
+lista de erros. As rotas sem schema (`GET /health`, `GET /*/me`, `DELETE /users/me`)
+não recebem entrada do cliente.
+
+TLS: encerrado pelo Caddy no deploy (ver [deploy.md](deploy.md)), com certificado
+automático (Let's Encrypt ou CA interna). A aplicação fala HTTP só na rede interna
+do Compose.

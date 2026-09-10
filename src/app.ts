@@ -13,6 +13,7 @@ import { matchingPlugin } from "./plugins/matching.js";
 import { metricsPlugin } from "./plugins/metrics.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
+import { securityPlugin } from "./plugins/security.js";
 import { socketPlugin } from "./plugins/socket.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
 import { userRoutes } from "./modules/users/users.routes.js";
@@ -76,6 +77,10 @@ export async function buildApp() {
       return reply.fail(422, "Payload inválido", { errors });
     }
 
+    if (error.statusCode === 429) {
+      return reply.fail(429, "Muitas requisições. Tente novamente em instantes.");
+    }
+
     const status = error.statusCode ?? 500;
     if (status >= 500) {
       req.log.error({ err: error }, "unhandled error");
@@ -88,6 +93,7 @@ export async function buildApp() {
   await app.register(metricsPlugin);
   await app.register(prismaPlugin);
   await app.register(redisPlugin);
+  await app.register(securityPlugin);
   await app.register(socketPlugin);
   await app.register(matchingPlugin);
   await app.register(locationRetentionPlugin);
