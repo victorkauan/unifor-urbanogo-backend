@@ -61,6 +61,7 @@ em [deploy.md](deploy.md).
 | `npm run lint` | ESLint + Prettier (check) |
 | `npm run format` | Prettier (write) |
 | `npm test` | Testes (Vitest). Testes com `describe.runIf(RUN_DB_TESTS === "1")` rodam contra Postgres/Redis reais |
+| `npm run test:coverage` | Testes com relatório de cobertura (`text` + `html` em `coverage/`). Manual, sem gate no CI — ver [plano-de-testes.md](plano-de-testes.md) |
 | `npm run db:migrate` | Migrations do Prisma |
 | `npm run db:generate` | Gera o Prisma Client |
 | `npm run db:seed` | Popula o banco com dados de teste |

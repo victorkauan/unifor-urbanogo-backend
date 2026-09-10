@@ -9,5 +9,11 @@ export default defineConfig({
     // (globalSetup); arquivos em paralelo mutando as mesmas tabelas causam
     // condição de corrida entre eles (ex.: um TRUNCATE no meio do seed de outro).
     fileParallelism: false,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts", "src/server.ts"],
+    },
   },
 });

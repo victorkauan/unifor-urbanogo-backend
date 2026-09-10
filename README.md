@@ -24,6 +24,7 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 | [docs/contrato-api.md](docs/contrato-api.md) | Endpoints REST e eventos WebSocket |
 | [docs/er.md](docs/er.md) | Modelo de dados |
 | [docs/setup.md](docs/setup.md) | Rodar o backend em desenvolvimento e produção |
+| [docs/plano-de-testes.md](docs/plano-de-testes.md) | Pirâmide de testes, cobertura e o que roda no CI |
 | [docs/deploy.md](docs/deploy.md) | Deploy do MVP na VPS (Caddy, Ansible, GitHub Actions) |
 | [docs/devsecops.md](docs/devsecops.md) | Checks de segurança no CI: audit, secret scan, SAST, Dependabot |
 | [docs/lgpd.md](docs/lgpd.md) | Dados pessoais tratados, base legal e política de retenção |
