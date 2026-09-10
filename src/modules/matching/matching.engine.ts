@@ -129,9 +129,13 @@ export class MatchingEngine {
     };
     await saveSearchState(this.redis, state, this.config.stateTtlSeconds);
 
-    const global = this.scheduler.schedule(this.config.globalTimeoutMs, () =>
-      this.fail(rideId, "timeout"),
-    );
+    const global = this.scheduler.schedule(this.config.globalTimeoutMs, async () => {
+      try {
+        await this.fail(rideId, "timeout");
+      } catch (err) {
+        this.logger.error({ err, rideId }, "falha ao expirar busca por timeout global");
+      }
+    });
     this.timers.set(rideId, { global });
     this.updateQueueGauge();
 
@@ -279,9 +283,16 @@ export class MatchingEngine {
 
     const previous = this.timers.get(rideId);
     previous?.offer?.cancel();
-    const offerTimer = this.scheduler.schedule(this.config.offerTimeoutMs, () =>
-      this.onOfferTimeout(rideId, offer.id),
-    );
+    const offerTimer = this.scheduler.schedule(this.config.offerTimeoutMs, async () => {
+      try {
+        await this.onOfferTimeout(rideId, offer.id);
+      } catch (err) {
+        this.logger.error(
+          { err, rideId, offerId: offer.id },
+          "falha ao processar timeout de oferta",
+        );
+      }
+    });
     this.timers.set(rideId, {
       global: previous?.global ?? { cancel() {} },
       offer: offerTimer,
@@ -356,6 +367,48 @@ export class MatchingEngine {
     for (const rideId of [...this.timers.keys()]) {
       this.stopTimers(rideId);
     }
+  }
+
+  /**
+   * Fecha buscas/ofertas travadas que passaram do próprio prazo sem ninguém
+   * pra fechá-las - acontece quando o processo reinicia com buscas em
+   * andamento (stopAll() cancela os timers em memória sem atualizar o
+   * Postgres) ou quando um timer chega a disparar mas o callback falha
+   * (mesmo agora logando o erro, a corrida/oferta fica parada até algo
+   * reprocessar). Sem isso, o motorista de uma oferta "pending" travada fica
+   * permanentemente fora do matching (dropBusyDrivers) mesmo livre de
+   * verdade. Idempotente - seguro de chamar em intervalo (ver
+   * plugins/matching.ts).
+   */
+  async reconcileStale(): Promise<{ offers: number; searches: number }> {
+    const now = new Date(this.now());
+
+    const staleOffers = await this.prisma.rideOffer.updateMany({
+      where: { status: "pending", expiresAt: { lt: now } },
+      data: { status: "timed_out", respondedAt: now },
+    });
+
+    const searchDeadline = new Date(this.now() - this.config.globalTimeoutMs);
+    const staleSearches = await this.prisma.ride.findMany({
+      where: { status: "searching", requestedAt: { lt: searchDeadline } },
+      select: { id: true },
+    });
+    for (const { id: rideId } of staleSearches) {
+      try {
+        await this.fail(rideId, "timeout");
+      } catch (err) {
+        this.logger.error({ err, rideId }, "falha ao reconciliar busca travada");
+      }
+    }
+
+    if (staleOffers.count > 0 || staleSearches.length > 0) {
+      this.logger.warn(
+        { staleOffers: staleOffers.count, staleSearches: staleSearches.length },
+        "reconciliação encontrou buscas/ofertas travadas",
+      );
+    }
+
+    return { offers: staleOffers.count, searches: staleSearches.length };
   }
 
   private stopTimers(rideId: string): void {

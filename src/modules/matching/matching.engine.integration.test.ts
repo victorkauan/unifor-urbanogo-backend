@@ -382,4 +382,42 @@ describe.runIf(shouldRun)("MatchingEngine", () => {
     expect(cancels).toEqual([{ rideId: ride.id, reason: "cancelled" }]);
     expect(scheduler.activeCount()).toBe(0);
   });
+
+  it("reconcileStale closes a pending offer whose timer never fired", async () => {
+    const passenger = await createTestUser(prisma);
+    await onlineDriverAt(-3.732, -38.527);
+    const ride = await searchingRide(passenger.id);
+
+    const { engine, offers } = buildEngine();
+    await engine.start(ride.id);
+    const offerId = offers[0]!.payload.offer_id;
+
+    // Simula o timer da oferta se perdendo (ex.: stopAll() num restart, ou
+    // um erro engolido no callback) em vez de disparar normalmente.
+    await prisma.rideOffer.update({
+      where: { id: offerId },
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+    });
+
+    const result = await engine.reconcileStale();
+
+    expect(result.offers).toBe(1);
+    const reconciled = await prisma.rideOffer.findUnique({ where: { id: offerId } });
+    expect(reconciled?.status).toBe("timed_out");
+  });
+
+  it("reconcileStale expires a ride stuck searching past its global deadline", async () => {
+    const passenger = await createTestUser(prisma);
+    const ride = await searchingRide(passenger.id, {
+      requestedAt: new Date(Date.now() - 70_000),
+    });
+
+    const { engine, cancels } = buildEngine();
+    const result = await engine.reconcileStale();
+
+    expect(result.searches).toBe(1);
+    expect(cancels).toEqual([{ rideId: ride.id, reason: "timeout" }]);
+    const finalRide = await prisma.ride.findUnique({ where: { id: ride.id } });
+    expect(finalRide?.status).toBe("expired");
+  });
 });

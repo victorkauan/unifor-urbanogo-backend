@@ -1,8 +1,9 @@
+import type { PrismaClient } from "@prisma/client";
 import type { FastifyBaseLogger } from "fastify";
 import type { Redis } from "ioredis";
 import type { Server, Socket } from "socket.io";
 import { recordDriverPresence } from "./demand-signal.repo.js";
-import { saveDriverLocation } from "./driver-location.repo.js";
+import { saveDriverLocation, upsertDriverLocation } from "./driver-location.repo.js";
 import type { PositionTracker } from "./position-tracker.js";
 import { driverLocationEventSchema, rideRoomEventSchema } from "./realtime.schema.js";
 
@@ -36,6 +37,7 @@ function emitInvalidPayload(socket: RealtimeSocket, event: string, message: stri
 export function registerRealtimeGateway(
   io: RealtimeServer,
   redis: Redis,
+  prisma: PrismaClient,
   tracker: PositionTracker,
 ) {
   io.on("connection", (socket: RealtimeSocket) => {
@@ -78,6 +80,7 @@ export function registerRealtimeGateway(
       Promise.all([
         saveDriverLocation(redis, userId, parsed.data),
         recordDriverPresence(redis, userId, parsed.data),
+        upsertDriverLocation(prisma, userId, parsed.data),
       ])
         .then(() => {
           log.debug({ lat: parsed.data.lat, lng: parsed.data.lng }, "posição do motorista gravada");

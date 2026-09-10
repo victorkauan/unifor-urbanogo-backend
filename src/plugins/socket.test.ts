@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
+import { createTestDriver } from "../../test/fixtures.js";
 import { buildApp, type AppInstance } from "../app.js";
 import { signToken } from "../lib/jwt.js";
 import { positionUpdateLatency } from "../lib/metrics.js";
@@ -9,6 +10,9 @@ import {
   driverLocationKey,
 } from "../modules/realtime/driver-location.repo.js";
 import { rideRoom } from "../modules/realtime/realtime.gateway.js";
+import { findNearbyOnlineDrivers } from "../modules/rides/nearby-drivers.js";
+
+const shouldRunDbTests = process.env.RUN_DB_TESTS === "1";
 
 let app: AppInstance;
 let address: string;
@@ -228,6 +232,62 @@ describe("server-side position broadcast (RT-4)", () => {
     restoreAll(demandSpies);
     findFirstSpy.mockRestore();
     driver.close();
+  });
+});
+
+describe.runIf(shouldRunDbTests)("driver:location syncs to Postgres for matching", () => {
+  it("upserts driver_locations so the driver becomes discoverable via findNearbyOnlineDrivers", async () => {
+    const driver = await createTestDriver(app.prisma, { isOnline: true });
+    const client = connect(signToken({ sub: driver.userId }));
+    await waitFor(client, "connect");
+
+    client.emit("driver:location", {
+      lat: -3.7319,
+      lng: -38.5267,
+      heading: 90,
+      speed: 10,
+      recorded_at: new Date().toISOString(),
+    });
+
+    await vi.waitFor(async () => {
+      const stored = await app.prisma.driverLocation.findUnique({ where: { driverId: driver.id } });
+      expect(stored).not.toBeNull();
+      expect(stored?.lat).toBeCloseTo(-3.7319, 4);
+      expect(stored?.lng).toBeCloseTo(-38.5267, 4);
+    });
+
+    const nearby = await findNearbyOnlineDrivers(app.prisma, {
+      origin: { lat: -3.7319, lng: -38.5267 },
+      radiusKm: 1,
+    });
+    expect(nearby.map((d) => d.driverId)).toContain(driver.id);
+
+    await app.prisma.driverLocation.delete({ where: { driverId: driver.id } });
+    await app.prisma.driver.delete({ where: { id: driver.id } });
+    await app.prisma.user.delete({ where: { id: driver.userId } });
+    client.close();
+  });
+
+  it("does not write anything for a user without a driver profile", async () => {
+    const userId = randomUUID();
+    const client = connect(signToken({ sub: userId }));
+    await waitFor(client, "connect");
+
+    client.emit("driver:location", {
+      lat: -3.7319,
+      lng: -38.5267,
+      recorded_at: new Date().toISOString(),
+    });
+
+    // sem ack de driver:location; dá tempo do handler (que faz no-op) rodar
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const count = await app.prisma.driverLocation.count({
+      where: { driver: { userId } },
+    });
+    expect(count).toBe(0);
+
+    client.close();
   });
 });
 
