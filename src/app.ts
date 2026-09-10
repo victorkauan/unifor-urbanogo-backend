@@ -1,11 +1,27 @@
+import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from "fastify";
-import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
+import {
+  hasZodFastifySchemaValidationErrors,
+  serializerCompiler,
+  validatorCompiler,
+} from "fastify-type-provider-zod";
 import { config } from "./lib/config.js";
 import { AppError } from "./lib/errors.js";
 import { responsePlugin } from "./lib/response.js";
+import { locationRetentionPlugin } from "./plugins/location-retention.js";
+import { matchingPlugin } from "./plugins/matching.js";
+import { metricsPlugin } from "./plugins/metrics.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { redisPlugin } from "./plugins/redis.js";
+import { securityPlugin } from "./plugins/security.js";
+import { socketPlugin } from "./plugins/socket.js";
 import { healthRoutes } from "./modules/health/health.routes.js";
+import { userRoutes } from "./modules/users/users.routes.js";
+import { driverRoutes } from "./modules/drivers/drivers.routes.js";
+import { authRoutes } from "./modules/auth/auth.routes.js";
+import { offerRoutes } from "./modules/offers/offers.routes.js";
+import { rideRoutes } from "./modules/rides/rides.routes.js";
+import { quoteRoutes } from "./modules/quotes/quotes.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -19,16 +35,19 @@ export async function buildApp() {
             }
           : undefined,
     },
+    genReqId(req) {
+      const upstreamId = req.headers["x-request-id"];
+      return typeof upstreamId === "string" && upstreamId.length > 0 ? upstreamId : randomUUID();
+    },
   });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  await app.register(responsePlugin);
-  await app.register(prismaPlugin);
-  await app.register(redisPlugin);
-
-  await app.register(healthRoutes);
+  app.addHook("onSend", async (req, reply, payload) => {
+    reply.header("x-request-id", req.id);
+    return payload;
+  });
 
   app.setNotFoundHandler((req, reply) => {
     reply.fail(404, `Rota não encontrada: ${req.method} ${req.url}`);
@@ -39,12 +58,27 @@ export async function buildApp() {
       return reply.fail(error.statusCode, error.message, error.data);
     }
 
+    if (hasZodFastifySchemaValidationErrors(error)) {
+      const errors = error.validation.map((entry) => {
+        const issue = entry.params.issue;
+        return {
+          path: issue.path.length > 0 ? issue.path.join(".") : (entry.instancePath ?? ""),
+          message: issue.message,
+        };
+      });
+      return reply.fail(422, "Payload inválido", { errors });
+    }
+
     if (error.validation) {
       const errors = error.validation.map((issue) => ({
         path: issue.instancePath || issue.schemaPath,
         message: issue.message ?? "inválido",
       }));
       return reply.fail(422, "Payload inválido", { errors });
+    }
+
+    if (error.statusCode === 429) {
+      return reply.fail(429, "Muitas requisições. Tente novamente em instantes.");
     }
 
     const status = error.statusCode ?? 500;
@@ -54,6 +88,23 @@ export async function buildApp() {
     }
     return reply.fail(status, error.message);
   });
+
+  await app.register(responsePlugin);
+  await app.register(metricsPlugin);
+  await app.register(prismaPlugin);
+  await app.register(redisPlugin);
+  await app.register(securityPlugin);
+  await app.register(socketPlugin);
+  await app.register(matchingPlugin);
+  await app.register(locationRetentionPlugin);
+
+  await app.register(healthRoutes);
+  await app.register(userRoutes, { prefix: "/users" });
+  await app.register(authRoutes, { prefix: "/auth" });
+  await app.register(driverRoutes, { prefix: "/drivers" });
+  await app.register(offerRoutes, { prefix: "/offers" });
+  await app.register(rideRoutes, { prefix: "/rides" });
+  await app.register(quoteRoutes, { prefix: "/quotes" });
 
   return app;
 }

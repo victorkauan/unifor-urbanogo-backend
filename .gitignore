@@ -11,3 +11,8 @@ planejamento-tarefas.md
 .env.*
 !.env.example
 !.env.prod.example
+
+# ansible: inventario e vars reais ficam fora do git
+deploy/ansible/inventory.ini
+deploy/ansible/group_vars/all.yml
+*.retry

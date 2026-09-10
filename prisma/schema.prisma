@@ -101,28 +101,32 @@ model Driver {
 }
 
 model Ride {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  passengerId    String       @map("passenger_id") @db.Uuid
-  passenger      User         @relation("ride_passenger", fields: [passengerId], references: [id])
-  driverId       String?      @map("driver_id") @db.Uuid
-  driver         Driver?      @relation("ride_driver", fields: [driverId], references: [id])
-  type           RideType
-  status         RideStatus   @default(requested)
-  originLat      Float        @map("origin_lat")
-  originLng      Float        @map("origin_lng")
-  originAddress  String?      @map("origin_address")
-  destLat        Float        @map("dest_lat")
-  destLng        Float        @map("dest_lng")
-  destAddress    String?      @map("dest_address")
-  distanceMeters Int?         @map("distance_meters")
-  priceCents     Int?         @map("price_cents")
-  priceBreakdown Json?        @map("price_breakdown")
-  requestedAt    DateTime     @default(now()) @map("requested_at") @db.Timestamptz(6)
-  assignedAt     DateTime?    @map("assigned_at") @db.Timestamptz(6)
-  startedAt      DateTime?    @map("started_at") @db.Timestamptz(6)
-  completedAt    DateTime?    @map("completed_at") @db.Timestamptz(6)
-  cancelledAt    DateTime?    @map("cancelled_at") @db.Timestamptz(6)
-  cancelledBy    CancelledBy? @map("cancelled_by")
+  id              String       @id @default(uuid(7)) @db.Uuid
+  passengerId     String       @map("passenger_id") @db.Uuid
+  passenger       User         @relation("ride_passenger", fields: [passengerId], references: [id])
+  driverId        String?      @map("driver_id") @db.Uuid
+  driver          Driver?      @relation("ride_driver", fields: [driverId], references: [id])
+  type            RideType
+  status          RideStatus   @default(requested)
+  originLat       Float        @map("origin_lat")
+  originLng       Float        @map("origin_lng")
+  originAddress   String?      @map("origin_address")
+  destLat         Float        @map("dest_lat")
+  destLng         Float        @map("dest_lng")
+  destAddress     String?      @map("dest_address")
+  distanceMeters  Int?         @map("distance_meters")
+  priceCents      Int?         @map("price_cents")
+  priceBreakdown  Json?        @map("price_breakdown")
+  requestedAt     DateTime     @default(now()) @map("requested_at") @db.Timestamptz(6)
+  assignedAt      DateTime?    @map("assigned_at") @db.Timestamptz(6)
+  arrivedAt       DateTime?    @map("arrived_at") @db.Timestamptz(6)
+  startedAt       DateTime?    @map("started_at") @db.Timestamptz(6)
+  completedAt     DateTime?    @map("completed_at") @db.Timestamptz(6)
+  cancelledAt     DateTime?    @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy     CancelledBy? @map("cancelled_by")
+  cancelledReason String?      @map("cancelled_reason")
+
+  locationAnonymizedAt DateTime? @map("location_anonymized_at") @db.Timestamptz(6)
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)

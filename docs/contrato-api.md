@@ -222,7 +222,30 @@ Só é permitido avaliar corrida `completed`, uma avaliação por parte. `score`
 
 | Método | Rota | Resposta `data` |
 |---|---|---|
-| GET | `/health` | `{ uptime_seconds, timestamp }` |
+| GET | `/health` | `{ uptime_seconds, timestamp }` (liveness, sempre 200, não checa dependências) |
+| GET | `/ready` | `{ postgres: "ok"\|"erro", redis: "ok"\|"erro" }` (200 se ambos "ok", 503 caso contrário) |
+
+`/ready` é o que o reverse proxy e os alertas (OBS-5) devem checar antes de
+considerar a instância apta a receber tráfego.
+
+### Métricas
+
+| Método | Rota | Resposta |
+|---|---|---|
+| GET | `/metrics` | texto no formato de exposição do Prometheus (`Content-Type: text/plain`), **não** usa o envelope `{ status_code, message, data }` |
+
+Métricas próprias, além das padrão de processo (CPU, memória, event loop) do
+`prom-client`:
+
+| Métrica | Tipo | Labels | O que mede |
+|---|---|---|---|
+| `http_requests_total` | Counter | `method`, `route`, `status_code` | requisições/s e taxa de erro (via `rate()` no PromQL, filtrando `status_code` >= 500) |
+| `matching_search_duration_seconds` | Histogram | `outcome` (`assigned`, `no_drivers_available`, `drivers_exhausted`, `timeout`, `cancelled`) | latência do matching (RIDE-3), do início da busca até o desfecho |
+| `matching_queue_size` | Gauge | — | corridas em busca de motorista agora |
+| `position_update_latency_seconds` | Histogram | — | latência ponta a ponta da posição do motorista (RT-4) |
+| `ride_duration_seconds` | Histogram | — | duração da corrida, de `in_progress` até `completed` |
+| `demand_drivers_online` | Gauge | `cell` | motoristas online recentes por região (RT-5), recalculado a cada 15s |
+| `demand_requests_recent` | Gauge | `cell` | pedidos recentes por região (RT-5), recalculado a cada 15s |
 
 ## WebSocket (Socket.IO)
 
@@ -239,9 +262,9 @@ na sala para receber posição e status.
 
 | Evento | Payload | Descrição |
 |---|---|---|
-| `ride:join` | `{ ride_id }` | entra na sala da corrida |
-| `ride:leave` | `{ ride_id }` | sai da sala |
-| `driver:location` | `{ lat, lng, heading?, speed?, accuracy?, recorded_at }` | app do motorista envia a posição em intervalo (frequência definida na RT-1) |
+| `ride:join` | `{ ride_id }` | entra na sala da corrida. Aceita ack opcional: `socket.emit("ride:join", payload, (result) => ...)`, `result` é `{ ok: boolean }` |
+| `ride:leave` | `{ ride_id }` | sai da sala. Mesmo ack opcional de `ride:join` |
+| `driver:location` | `{ lat, lng, heading?, speed?, accuracy?, recorded_at }` | app do motorista envia a posição a cada 5s ou 20m de deslocamento, o que vier primeiro (decisão da RT-1, ver [ADR 0002](adr/0002-rastreamento-tempo-real.md)) |
 
 ### Servidor para cliente
 
@@ -249,13 +272,15 @@ na sala para receber posição e status.
 |---|---|---|
 | `matching:offer` | `{ offer_id, ride_id, expires_at, pickup, dropoff, passenger: { name, trust_score }, distance_to_pickup_meters, price_cents }` | motorista candidato |
 | `matching:cancelled` | `{ ride_id, reason }` | passageiro, quando a busca esgota ou estoura o timeout global |
-| `ride:status` | `{ ride_id, status, driver?, updated_at }` | sala da corrida, a cada transição de estado |
-| `ride:driver_location` | `{ ride_id, lat, lng, heading?, speed?, recorded_at, predicted? }` | passageiro; posição consolidada do motorista (estratégia da RT-1 e RT-4) |
+| `ride:status` | `{ ride_id, status, driver?, arrived_at?, updated_at }` | sala da corrida, a cada transição de estado e também em `arrive` (que não muda `status`, só preenche `arrived_at`) |
+| `ride:driver_location` | `{ ride_id, lat, lng, heading?, speed?, recorded_at, predicted }` | passageiro; posição consolidada do motorista pelo servidor (RT-4 / URB-42). `predicted` é `true` quando o ponto é extrapolado por dead reckoning entre leituras reais, `false` quando vem direto de um `driver:location` |
 | `error` | `{ code, message }` | quem causou o erro |
 
 `pickup` e `dropoff`: `{ lat, lng, address? }`. Os payloads de posição
-(`driver:location`, `ride:driver_location`) são provisórios e serão fechados pela
-RT-1 (URB-16).
+(`driver:location`, `ride:driver_location`) estão fechados pela RT-1
+([ADR 0002](adr/0002-rastreamento-tempo-real.md), URB-16). Degradação: se o
+socket cair, o app cai para polling em `GET /rides/:id` a cada 10s até
+reconectar.
 
 ## Fluxo de referência
 
@@ -273,6 +298,5 @@ RT-1 (URB-16).
 
 ## Pendências
 
-- Payloads de posição no socket: fechar com a RT-1.
 - Refresh token / expiração do JWT: definir na USR-1.
 - Webhook ou push notification para o app fora do socket: fora do escopo do MVP.

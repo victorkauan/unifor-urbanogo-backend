@@ -24,6 +24,12 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 | [docs/contrato-api.md](docs/contrato-api.md) | Endpoints REST e eventos WebSocket |
 | [docs/er.md](docs/er.md) | Modelo de dados |
 | [docs/setup.md](docs/setup.md) | Rodar o backend em desenvolvimento e produção |
+| [docs/plano-de-testes.md](docs/plano-de-testes.md) | Pirâmide de testes, cobertura e o que roda no CI |
+| [docs/relatorio-teste-de-carga.md](docs/relatorio-teste-de-carga.md) | Execução do k6 contra a VPS e comparação vs SLA |
+| [docs/plano-de-escala.md](docs/plano-de-escala.md) | Gargalos e estratégias de escala amarrados ao SLA |
+| [docs/deploy.md](docs/deploy.md) | Deploy do MVP na VPS (Caddy, Ansible, GitHub Actions) |
+| [docs/devsecops.md](docs/devsecops.md) | Checks de segurança no CI: audit, secret scan, SAST, Dependabot |
+| [docs/lgpd.md](docs/lgpd.md) | Dados pessoais tratados, base legal e política de retenção |
 | [docs/adr/0001-stack.md](docs/adr/0001-stack.md) | Decisões de stack e convenções de código |
 
 ## Início rápido
@@ -31,9 +37,10 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 ```bash
 cp .env.example .env
 npm install
-docker compose up -d
+npm run dev:up
 npm run dev
 ```
 
-API em `http://localhost:3000`, rota `GET /health`. Detalhes em
-[docs/setup.md](docs/setup.md).
+`npm run dev:up` sobe PostgreSQL e Redis, aplica as migrations e popula o banco
+com dados de exemplo. API em `http://localhost:3000`, rota `GET /health`. Detalhes
+em [docs/setup.md](docs/setup.md).
