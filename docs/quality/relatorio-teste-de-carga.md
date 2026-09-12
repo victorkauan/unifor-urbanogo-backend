@@ -87,7 +87,7 @@ encontrar motorista.
 ## Achado: a cauda de ~15-30 segundos
 
 O motor de matching oferece a corrida a **um candidato por vez**, esperando até 15s
-por uma resposta antes de passar pro próximo (ver ADR 0001). Se a oferta chega
+por uma resposta antes de passar pro próximo (ver ADR 0014). Se a oferta chega
 justamente no instante em que o socket daquele motorista não está conectado - a
 troca de janela de 30s do motorista simulado, ou (hipótese, não confirmada por
 falta de acesso à VPS) uma conta de teste de uma execução anterior que ainda

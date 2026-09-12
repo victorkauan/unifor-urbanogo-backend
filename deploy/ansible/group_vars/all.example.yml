@@ -1,6 +1,6 @@
 # Copie para group_vars/all.yml para rodar o playbook a mao.
 # No GitHub Actions esses valores chegam por variaveis de ambiente
-# (ver .github/workflows/deploy.yml e docs/deploy.md); nao versione segredos.
+# (ver .github/workflows/deploy.yml e docs/operations/deploy.md); nao versione segredos.
 
 app_dir: /opt/urbanogo
 repo_url: https://github.com/victorkauan/unifor-urbanogo-backend.git
