@@ -4,7 +4,7 @@
 
 Stack definida pela equipe, simples de propósito, para caber no orçamento de
 4 semanas, 4 pessoas, 7h por semana cada. As decisões de stack e convenções do
-backend estão detalhadas em [adr/0004-stack.md](adr/0004-stack.md).
+backend estão detalhadas nas [ADRs em docs/adr/](adr/).
 
 | Camada | Tecnologia | Por quê |
 |---|---|---|

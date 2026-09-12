@@ -4,13 +4,13 @@ import { demandDriversOnline, demandRequestsRecent } from "../../lib/metrics.js"
 
 /**
  * Grade simples (2 casas decimais ≈ 1.1km por célula em Fortaleza), em vez de
- * geohash: sem extensão geoespacial no Postgres já é a decisão do ADR 0004,
+ * geohash: sem extensão geoespacial no Postgres já é a decisão do ADR 0002,
  * e aqui nem toca banco - é só uma chave de agrupamento pro Redis.
  */
 const GRID_PRECISION = 2;
 
 /**
- * Um pouco maior que o intervalo de envio do driver:location (5s, ADR 0005),
+ * Um pouco maior que o intervalo de envio do driver:location (5s, ADR 0004),
  * pra tolerar jitter sem contar um motorista como offline cedo demais.
  */
 export const DRIVER_PRESENCE_WINDOW_MS = 20_000;

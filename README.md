@@ -30,7 +30,7 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 | [docs/deploy.md](docs/deploy.md) | Deploy do MVP na VPS (Caddy, Ansible, GitHub Actions) |
 | [docs/devsecops.md](docs/devsecops.md) | Checks de segurança no CI: audit, secret scan, SAST, Dependabot |
 | [docs/lgpd.md](docs/lgpd.md) | Dados pessoais tratados, base legal e política de retenção |
-| [docs/adr/0004-stack.md](docs/adr/0004-stack.md) | Decisões de stack e convenções de código |
+| [docs/adr/](docs/adr/) | Registros de decisão (ADR), uma por decisão técnica |
 
 ## Início rápido
 

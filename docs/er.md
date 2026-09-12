@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Backend em PostgreSQL via Prisma. Convenções em [adr/0004-stack.md](adr/0004-stack.md):
+Backend em PostgreSQL via Prisma. Convenções em [ADR 0011 - UUID v7](adr/0011-uuid-v7-como-identificador.md) e [ADR 0012 - timestamptz UTC](adr/0012-timestamptz-utc-para-datas.md):
 IDs em UUID v7 (`@default(uuid(7))`, gerado no cliente), datas em `timestamptz` (UTC),
 tabelas e colunas em `snake_case`.
 
