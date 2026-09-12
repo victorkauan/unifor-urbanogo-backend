@@ -71,7 +71,7 @@ precificação e state machine da corrida vale.
 
 ## Testes de contrato entre app e API
 
-[`contrato-api.md`](contrato-api.md) é a fonte da verdade e "congela" depois
+[`contrato-api.md`](../architecture/contrato-api.md) é a fonte da verdade e "congela" depois
 do fim do dia 1 do planejamento — qualquer mudança passa por lá e
 avisa o time, especificamente o Matheus (app).
 
@@ -96,7 +96,7 @@ começar a integrar de verdade contra a API.
 
 ## O que roda no CI
 
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml), a cada push em
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), a cada push em
 `main`/`develop` e a cada PR:
 
 1. `npm ci`

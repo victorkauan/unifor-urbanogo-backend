@@ -7,7 +7,7 @@
 
 Toda rota da API que recebe entrada do cliente (app Flutter) precisa validar o
 payload antes de chegar à camada de regra de negócio, e o contrato de API
-(`docs/contrato-api.md`) precisa de uma fonte única de verdade para o formato
+(`docs/architecture/contrato-api.md`) precisa de uma fonte única de verdade para o formato
 de cada payload, tanto para validar quanto para documentar.
 
 ## Decisão

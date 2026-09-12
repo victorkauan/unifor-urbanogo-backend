@@ -12,7 +12,7 @@ enviam a posição em intervalos e o cliente preenche o movimento entre uma
 atualização e outra. Esta ADR fecha os números para o UrbanoGo, dentro do SLA
 já definido (posição do motorista em menos de 5s) e do payload do socket
 (`driver:location` / `ride:driver_location`) descrito em
-[docs/contrato-api.md](../contrato-api.md).
+[docs/architecture/contrato-api.md](../architecture/contrato-api.md).
 
 ## Decisão
 

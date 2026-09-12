@@ -54,7 +54,7 @@ MSYS_NO_PATHCONV=1 docker run --rm \
 
 Os dois últimos existem pra dar controle fino sobre a taxa total de requisições -
 importante se o ambiente alvo tiver rate limiting (ex.: contra um ambiente
-publicado real, ver `docs/relatorio-teste-de-carga.md`): aumentar o intervalo de
+publicado real, ver `docs/quality/relatorio-teste-de-carga.md`): aumentar o intervalo de
 polling e a pausa do passageiro reduz bastante o número de requisições/minuto sem
 mudar o número de VUs.
 
@@ -85,7 +85,7 @@ k6 run -e DRIVER_VUS=20 -e PASSENGER_VUS=40 -e DURATION=5m load-tests/rush.js
   maior do que o cenário pretende, e a proporção "N passageiros por
   motorista" perde sentido.
 
-## SLA de referência (docs/visao-geral.md)
+## SLA de referência (docs/planning/visao-geral.md)
 
 - Matching: menor que 3s, ponta a ponta, do pedido até o motorista atribuído
   - métrica `{name}_matching_latency_ms` (ex.: `rush_matching_latency_ms`).

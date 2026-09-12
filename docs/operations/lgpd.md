@@ -5,7 +5,7 @@ grupo (Lei 13.709/2018, art. 7 e art. 11) e por quanto tempo cada coisa fica
 guardada. Serve de referência para o time e define o que o job de expurgo e
 anonimização (SEC-4, URB-65) precisa apagar ou anonimizar.
 
-Fonte dos campos: `prisma/schema.prisma` e [docs/er.md](er.md). Controlador: Equipe
+Fonte dos campos: `prisma/schema.prisma` e [docs/architecture/er.md](../architecture/er.md). Controlador: Equipe
 06 (projeto acadêmico). Não há tratamento de dados de crianças e adolescentes nem,
 por ora, de categorias sensíveis.
 

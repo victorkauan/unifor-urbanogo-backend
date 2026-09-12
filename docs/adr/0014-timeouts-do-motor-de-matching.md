@@ -45,4 +45,4 @@ de 3s no caminho feliz, sem contar com uma fila dedicada (ex.: BullMQ) no MVP.
     busca ativa — aceitável só para o MVP de instância única.
   * Ofertar um candidato por vez, com 15s de espera cada, gera uma cauda de
     latência alta quando o pool de motoristas disponíveis é pequeno (medido no
-    teste de carga, ver `docs/relatorio-teste-de-carga.md`).
+    teste de carga, ver `docs/quality/relatorio-teste-de-carga.md`).
