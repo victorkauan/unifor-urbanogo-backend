@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Backend em PostgreSQL via Prisma. Convenções em [adr/0001-stack.md](adr/0001-stack.md):
+Backend em PostgreSQL via Prisma. Convenções em [ADR 0011 - UUID v7](../adr/0011-uuid-v7-como-identificador.md) e [ADR 0012 - timestamptz UTC](../adr/0012-timestamptz-utc-para-datas.md):
 IDs em UUID v7 (`@default(uuid(7))`, gerado no cliente), datas em `timestamptz` (UTC),
 tabelas e colunas em `snake_case`.
 
@@ -115,7 +115,7 @@ Uma corrida ou entrega. `status`: `requested` -> `searching` -> `assigned` ->
 multiplicadores, taxa). `driver_id` é nulo até a atribuição e referencia `drivers`.
 Marcos de tempo (`assigned_at`, `started_at`, etc.) para métricas e histórico.
 `location_anonymized_at` marca quando a varredura de retenção (SEC-4) arredondou
-as coordenadas e apagou os endereços; ver `docs/lgpd.md`.
+as coordenadas e apagou os endereços; ver `docs/operations/lgpd.md`.
 
 ### ride_offers
 

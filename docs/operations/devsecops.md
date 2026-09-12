@@ -6,7 +6,7 @@ uma falha apareça direto no Pull Request.
 
 ## O que roda no CI
 
-O workflow [`.github/workflows/security.yml`](../.github/workflows/security.yml)
+O workflow [`.github/workflows/security.yml`](../../.github/workflows/security.yml)
 roda em todo push para `main` e `develop`, em todo Pull Request e uma vez por
 semana (agendado). São três jobs independentes:
 
@@ -23,7 +23,7 @@ em nível `moderate` (`continue-on-error`), para acompanhar dívidas de
 
 ## Dependabot
 
-[`.github/dependabot.yml`](../.github/dependabot.yml) abre PRs semanais de
+[`.github/dependabot.yml`](../../.github/dependabot.yml) abre PRs semanais de
 atualização para três ecossistemas: `npm`, `github-actions` e `docker`. As
 atualizações `minor` e `patch` de npm vêm agrupadas em um único PR.
 

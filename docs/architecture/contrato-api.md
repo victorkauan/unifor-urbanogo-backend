@@ -264,7 +264,7 @@ na sala para receber posição e status.
 |---|---|---|
 | `ride:join` | `{ ride_id }` | entra na sala da corrida. Aceita ack opcional: `socket.emit("ride:join", payload, (result) => ...)`, `result` é `{ ok: boolean }` |
 | `ride:leave` | `{ ride_id }` | sai da sala. Mesmo ack opcional de `ride:join` |
-| `driver:location` | `{ lat, lng, heading?, speed?, accuracy?, recorded_at }` | app do motorista envia a posição a cada 5s ou 20m de deslocamento, o que vier primeiro (decisão da RT-1, ver [ADR 0002](adr/0002-rastreamento-tempo-real.md)) |
+| `driver:location` | `{ lat, lng, heading?, speed?, accuracy?, recorded_at }` | app do motorista envia a posição a cada 5s ou 20m de deslocamento, o que vier primeiro (decisão da RT-1, ver [ADR 0004](../adr/0004-rastreamento-tempo-real.md)) |
 
 ### Servidor para cliente
 
@@ -278,7 +278,7 @@ na sala para receber posição e status.
 
 `pickup` e `dropoff`: `{ lat, lng, address? }`. Os payloads de posição
 (`driver:location`, `ride:driver_location`) estão fechados pela RT-1
-([ADR 0002](adr/0002-rastreamento-tempo-real.md), URB-16). Degradação: se o
+([ADR 0004](../adr/0004-rastreamento-tempo-real.md), URB-16). Degradação: se o
 socket cair, o app cai para polling em `GET /rides/:id` a cada 10s até
 reconectar.
 

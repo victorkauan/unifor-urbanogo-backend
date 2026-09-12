@@ -1,4 +1,4 @@
-# 0003. Usar JWT sem estado para autenticação de usuários
+# 0001. Usar JWT sem estado para autenticação de usuários
 
 * **Status:** Aceito
 * **Data:** 2026-09-11

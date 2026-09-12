@@ -10,7 +10,7 @@ const TERMINAL_STATUSES = ["completed", "cancelled", "expired"] as const;
 /**
  * Casas decimais mantidas na latitude/longitude de corridas antigas. 2 casas em
  * graus equivalem a ~1,1 km, suficiente para métricas de região sem apontar
- * origem e destino exatos de uma pessoa. Ver docs/lgpd.md (grupo 3).
+ * origem e destino exatos de uma pessoa. Ver docs/operations/lgpd.md (grupo 3).
  */
 const ANONYMIZED_COORDINATE_DECIMALS = 2;
 

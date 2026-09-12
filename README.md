@@ -16,21 +16,46 @@ precificação dinâmica e rastreamento em tempo real. Este repositório é o ba
 
 ## Documentação
 
+### `docs/planning/` - planejamento e sprints
+
 | Documento | Conteúdo |
 |---|---|
-| [docs/visao-geral.md](docs/visao-geral.md) | Contexto do negócio, escopo, SLA e mapa de disciplinas |
-| [docs/arquitetura.md](docs/arquitetura.md) | Stack, motor de matching e precificação, visão macro |
-| [docs/roadmap.md](docs/roadmap.md) | Entregas do curso e continuidade do produto |
-| [docs/contrato-api.md](docs/contrato-api.md) | Endpoints REST e eventos WebSocket |
-| [docs/er.md](docs/er.md) | Modelo de dados |
-| [docs/setup.md](docs/setup.md) | Rodar o backend em desenvolvimento e produção |
-| [docs/plano-de-testes.md](docs/plano-de-testes.md) | Pirâmide de testes, cobertura e o que roda no CI |
-| [docs/relatorio-teste-de-carga.md](docs/relatorio-teste-de-carga.md) | Execução do k6 contra a VPS e comparação vs SLA |
-| [docs/plano-de-escala.md](docs/plano-de-escala.md) | Gargalos e estratégias de escala amarrados ao SLA |
-| [docs/deploy.md](docs/deploy.md) | Deploy do MVP na VPS (Caddy, Ansible, GitHub Actions) |
-| [docs/devsecops.md](docs/devsecops.md) | Checks de segurança no CI: audit, secret scan, SAST, Dependabot |
-| [docs/lgpd.md](docs/lgpd.md) | Dados pessoais tratados, base legal e política de retenção |
-| [docs/adr/0001-stack.md](docs/adr/0001-stack.md) | Decisões de stack e convenções de código |
+| [docs/planning/visao-geral.md](docs/planning/visao-geral.md) | Contexto do negócio, escopo, SLA e mapa de disciplinas |
+| [docs/planning/roadmap.md](docs/planning/roadmap.md) | Entregas do curso e continuidade do produto |
+| [docs/planning/priorizacao-sprint-1.md](docs/planning/priorizacao-sprint-1.md) | As 3 features priorizadas na sprint 1, critérios e o que ficou de fora |
+| [docs/planning/atividades-sprint-1.md](docs/planning/atividades-sprint-1.md) | Desmembramento dia a dia de cada feature priorizada |
+| [docs/planning/apresentacao-entrega-1-planejamento.pdf](docs/planning/apresentacao-entrega-1-planejamento.pdf) | Slides da apresentação da Entrega 1 |
+
+### `docs/architecture/` - arquitetura e contratos
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/architecture/arquitetura.md](docs/architecture/arquitetura.md) | Stack, motor de matching e precificação, visão macro |
+| [docs/architecture/contrato-api.md](docs/architecture/contrato-api.md) | Endpoints REST e eventos WebSocket |
+| [docs/architecture/er.md](docs/architecture/er.md) | Modelo de dados |
+
+### `docs/operations/` - operação e conformidade
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/operations/setup.md](docs/operations/setup.md) | Rodar o backend em desenvolvimento e produção |
+| [docs/operations/deploy.md](docs/operations/deploy.md) | Deploy do MVP na VPS (Caddy, Ansible, GitHub Actions) |
+| [docs/operations/devsecops.md](docs/operations/devsecops.md) | Checks de segurança no CI: audit, secret scan, SAST, Dependabot |
+| [docs/operations/lgpd.md](docs/operations/lgpd.md) | Dados pessoais tratados, base legal e política de retenção |
+
+### `docs/quality/` - testes e escala
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/quality/plano-de-testes.md](docs/quality/plano-de-testes.md) | Pirâmide de testes, cobertura e o que roda no CI |
+| [docs/quality/relatorio-teste-de-carga.md](docs/quality/relatorio-teste-de-carga.md) | Execução do k6 contra a VPS e comparação vs SLA |
+| [docs/quality/plano-de-escala.md](docs/quality/plano-de-escala.md) | Gargalos e estratégias de escala amarrados ao SLA |
+
+### `docs/adr/` - registros de decisão
+
+| Documento | Conteúdo |
+|---|---|
+| [docs/adr/](docs/adr/) | Registros de decisão (ADR), uma por decisão técnica |
 
 ## Início rápido
 
@@ -43,4 +68,4 @@ npm run dev
 
 `npm run dev:up` sobe PostgreSQL e Redis, aplica as migrations e popula o banco
 com dados de exemplo. API em `http://localhost:3000`, rota `GET /health`. Detalhes
-em [docs/setup.md](docs/setup.md).
+em [docs/operations/setup.md](docs/operations/setup.md).
