@@ -67,7 +67,7 @@ k6 run -e DRIVER_VUS=20 -e PASSENGER_VUS=40 -e DURATION=5m load-tests/rush.js
 ## O que cada VU faz
 
 - **Motorista** (`driverIteration`, `lib/flows.js`): conecta no socket,
-  manda `driver:location` a cada 5s (ADR 0002) por até 30s, aceita a
+  manda `driver:location` a cada 5s (ADR 0005) por até 30s, aceita a
   primeira oferta que receber e passa pelo ciclo de vida (`arrive` → `start`
   → `complete`) pra voltar a ficar livre. Cada VU cria sua própria conta na
   primeira iteração e mantém essa identidade até o fim do teste (ver
@@ -89,7 +89,7 @@ k6 run -e DRIVER_VUS=20 -e PASSENGER_VUS=40 -e DURATION=5m load-tests/rush.js
 
 - Matching: menor que 3s, ponta a ponta, do pedido até o motorista atribuído
   - métrica `{name}_matching_latency_ms` (ex.: `rush_matching_latency_ms`).
-- Posição: menor que 5s (ADR 0002) - a carga do socket de posição roda em
+- Posição: menor que 5s (ADR 0005) - a carga do socket de posição roda em
   paralelo via `driver:location`, mas este script não mede a latência de
   entrega dessa posição especificamente (isso é `ws_msgs_sent`/
   `ws_msgs_received` e a saúde geral do socket sob carga).

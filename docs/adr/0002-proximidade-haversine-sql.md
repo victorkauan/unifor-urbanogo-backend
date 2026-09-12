@@ -1,4 +1,4 @@
-# 0004. Calcular proximidade por haversine em SQL
+# 0002. Calcular proximidade por haversine em SQL
 
 * **Status:** Aceito
 * **Data:** 2026-09-11

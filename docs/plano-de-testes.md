@@ -72,7 +72,7 @@ precificação e state machine da corrida vale.
 ## Testes de contrato entre app e API
 
 [`contrato-api.md`](contrato-api.md) é a fonte da verdade e "congela" depois
-do fim do dia 1 do planejamento (ADR 0001) — qualquer mudança passa por lá e
+do fim do dia 1 do planejamento (ADR 0004) — qualquer mudança passa por lá e
 avisa o time, especificamente o Matheus (app).
 
 O que já garante alinhamento automaticamente:

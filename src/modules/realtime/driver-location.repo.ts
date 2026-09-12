@@ -3,7 +3,7 @@ import type { Redis } from "ioredis";
 import type { DriverLocationEvent } from "./realtime.schema.js";
 
 /**
- * 3x o intervalo de envio decidido no ADR 0002 (5s), tolera 1-2 atualizações
+ * 3x o intervalo de envio decidido no ADR 0005 (5s), tolera 1-2 atualizações
  * perdidas antes de considerar o motorista offline para quem consome esta chave.
  */
 export const DRIVER_LOCATION_TTL_SECONDS = 15;

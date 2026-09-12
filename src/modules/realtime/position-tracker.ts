@@ -6,13 +6,13 @@ import { rideRoom, type RealtimeServer } from "./realtime.gateway.js";
 import type { DriverLocationEvent } from "./realtime.schema.js";
 
 /**
- * Rede de segurança independente do throttle de 5s do app (ADR 0002): evita
+ * Rede de segurança independente do throttle de 5s do app (ADR 0005): evita
  * inundar a sala em reconexões, retries duplicados ou múltiplos dispositivos.
  */
 const SERVER_BROADCAST_THROTTLE_MS = 2_000;
 
 /**
- * Metade do intervalo de envio real (5s, ADR 0002): preenche o meio do
+ * Metade do intervalo de envio real (5s, ADR 0005): preenche o meio do
  * caminho com um ponto por dead reckoning até a próxima leitura real chegar.
  */
 const PREDICTED_FOLLOWUP_DELAY_MS = 2_500;

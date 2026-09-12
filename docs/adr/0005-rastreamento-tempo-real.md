@@ -1,4 +1,4 @@
-# ADR 0002 - Estratégia de rastreamento em tempo real
+# ADR 0005 - Estratégia de rastreamento em tempo real
 
 Status: Aceito
 Data: 2026-09-07

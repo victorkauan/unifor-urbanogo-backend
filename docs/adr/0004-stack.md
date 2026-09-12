@@ -1,4 +1,4 @@
-# ADR 0001 - Stack e convenções do backend
+# ADR 0004 - Stack e convenções do backend
 
 Status: Aceito
 Data: 2026-09-06
